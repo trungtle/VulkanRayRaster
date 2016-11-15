@@ -8,7 +8,7 @@ Final Project: Hybrid Ray-Raster Renderer in Vulkan
  * Microsoft Windows 10 Home, i7-4790 CPU @ 3.60GHz 12GB, GTX 980 Ti (Person desktop).
  * Microsoft Windows  7 Professional, i7-5600U @ 2.6GHz, 256GB, GeForce 840M (Personal laptop).
 
- ## Overview
+## Overview
  We want to implement a hybrid raytracer-rasterizer[1] program in Vulkan[2] to accommodate rendering transparent objects for games. The basic concept is to use rasterization as deferred rendering for opaque objects in the scene and then apply a ray tracing pass on top of the G-buffer to render transparency and correct shadows. A ray-raster hybrid can also offer better anti-aliasing than the traditional shadow mapping of a pure rasterizer.
 
 The ray tracing component relies heavily on the compute power of the GPU, so we decided to use the Vulkan API since it supports access to both the graphics queue and the compute queue. In comparison to OpenGL, Vulkan doesn’t offer a drastic improvement in performance if the pipeline follows the rasterize-then-raytrace pattern. However, rasterization and ray tracing can be done asynchronously because Vulkan (and DirectX12) supports async compute[3]. This is a new feature that explicit graphics API offer over the traditional OpenGL style API that puts modern game engines in the more effective multithreading pattern. Games such as DOOM[4] and Rise of the Tomb Raider[5] take advantage of this async compute power to optimize for performance on threads that are idle and ready to submit compute command buffers .
@@ -21,17 +21,17 @@ As the end result, we would like to demonstrate both of the above bullet points 
 
 Part of the goal for this project is also to learn about explicit graphics API for rendering.
 
- ![](TLVulkanRenderer/images/DefRayTracing.png)
+![A](TLVulkanRenderer/images/DefRayTracing.png)
  
  
- ## Plan
+ ### Plan
  1. A basic Vulkan deferred renderer with glTF mesh support.
  2. Ray tracing for transparent objects using compute shaders.
  3. Physically accurate shadows via ray tracing.
  4. An acceleration data structure, BVH or kd-tree, for ray tracing. (Async Compute)
  5. Async compute for multithreading.
  
- ## Credits
+## Credits
 * [Practical techniques for ray-tracing in games](http://www.gamasutra.com/blogs/AlexandruVoica/20140318/213148/Practical_techniques_for_ray_tracing_in_games.php)
 * [GDCVault14: Practical techniques for ray-tracing in games] (http://www.gdcvault.com/play/1020688/Practical-Techniques-for-Ray-Tracing)
 * [Vulkan, Industry Forged](https://www.khronos.org/vulkan/)
