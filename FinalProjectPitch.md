@@ -24,7 +24,7 @@ Part of the goal for this project is also to learn about explicit graphics API f
 ![A](TLVulkanRenderer/images/DefRayTracing.png)
  
  
- ### Plan
+### Plan
  1. A basic Vulkan deferred renderer with glTF mesh support.
  2. Ray tracing for transparent objects using compute shaders.
  3. Physically accurate shadows via ray tracing.
