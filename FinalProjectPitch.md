@@ -28,6 +28,7 @@ As the end result, we would like to demonstrate both of the above bullet points 
 Part of the goal for this project is also to learn about explicit graphics API for rendering.
 
 ![A](TLVulkanRenderer/images/DefRayTracing.png)
+_Image taken from [Practical techniques for ray-tracing in games](http://www.gamasutra.com/blogs/AlexandruVoica/20140318/213148/Practical_techniques_for_ray_tracing_in_games.php)_
  
  
 ### Plan
