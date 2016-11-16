@@ -30,13 +30,19 @@ Part of the goal for this project is also to learn about explicit graphics API f
 ![A](TLVulkanRenderer/images/DefRayTracing.png)
 _Image taken from [Practical techniques for ray-tracing in games](http://www.gamasutra.com/blogs/AlexandruVoica/20140318/213148/Practical_techniques_for_ray_tracing_in_games.php)_
  
+### Milestones
+
+1. Deferred rendering with G-buffer: positions, normals, materials ID, albedo. Naive ray tracing and acceleration structure (kd-tree).
+2. Raytracing on G-buffer using compute.
+3. Performance analysis: comparing hybrid ray-raster with traditional deferred rendering and raytracing.
+
  
 ### Plan
  1. A basic Vulkan deferred renderer with glTF mesh support.
  2. Ray tracing for transparent objects using compute shaders.
  3. Physically accurate shadows and better support for anti-aliasing via ray tracing.
  4. An acceleration data structure, BVH or kd-tree, for ray tracing. (Async Compute)
- 5. Async compute for multithreading.
+ 5. (stretch) Async compute for multithreading.
  
 # Build
 
