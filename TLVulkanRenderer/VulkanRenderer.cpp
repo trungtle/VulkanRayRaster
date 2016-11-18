@@ -143,6 +143,10 @@ VulkanRenderer::VulkanRenderer(
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created depth image");
 
+	result = CreateRayTraceTextureResources();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Create ray trace texture resources");
+
 	result = CreateFramebuffers();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created framebuffers");
@@ -185,9 +189,9 @@ VulkanRenderer::~VulkanRenderer()
 	
 	vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
 
-	vkDestroyImageView(m_device, m_depthImageView, nullptr);
-	vkDestroyImage(m_device, m_depthImage, nullptr);
-	vkFreeMemory(m_device, m_depthImageMemory, nullptr);
+	vkDestroyImageView(m_device, m_depthTexture.imageView, nullptr);
+	vkDestroyImage(m_device, m_depthTexture.image, nullptr);
+	vkFreeMemory(m_device, m_depthTexture.imageMemory, nullptr);
 
 	for (GeometryBuffer& geomBuffer : m_geometryBuffers) {
 		vkFreeMemory(m_device, geomBuffer.vertexBufferMemory, nullptr);
@@ -866,6 +870,43 @@ VulkanRenderer::CreateCommandPool()
 }
 
 VkResult 
+VulkanRenderer::CreateRayTraceTextureResources() 
+{
+	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+
+	CreateImage(
+		m_swapchain.extent.width,
+		m_swapchain.extent.height,
+		1, // only a 2D depth image
+		VK_IMAGE_TYPE_2D,
+		imageFormat,
+		VK_IMAGE_TILING_OPTIMAL,
+		// Image is sampled in fragment shader and used as storage for compute output
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_rayTracedTexture.image,
+		m_rayTracedTexture.imageMemory
+	);
+	CreateImageView(
+		m_rayTracedTexture.image,
+		VK_IMAGE_VIEW_TYPE_2D,
+		imageFormat,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		m_rayTracedTexture.imageView
+	);
+
+	TransitionImageLayout(
+		m_rayTracedTexture.image,
+		imageFormat,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	);
+
+	return VK_SUCCESS;
+}
+
+VkResult 
 VulkanRenderer::CreateDepthResources() 
 {
 	VkFormat depthFormat = FindDepthFormat(m_physicalDevice);
@@ -879,19 +920,19 @@ VulkanRenderer::CreateDepthResources()
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_depthImage,
-		m_depthImageMemory
+		m_depthTexture.image,
+		m_depthTexture.imageMemory
 	);
 	CreateImageView(
-		m_depthImage,
+		m_depthTexture.image,
 		VK_IMAGE_VIEW_TYPE_2D,
 		depthFormat,
 		VK_IMAGE_ASPECT_DEPTH_BIT,
-		m_depthImageView
+		m_depthTexture.imageView
 	);
 
 	TransitionImageLayout(
-		m_depthImage,
+		m_depthTexture.image,
 		depthFormat,
 		VK_IMAGE_ASPECT_DEPTH_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1223,11 +1264,10 @@ VulkanRenderer::Update()
 	float timeSeconds = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
 
 	UniformBufferObject ubo = {};
-	timeSeconds = 0.0f;
 	ubo.model = glm::rotate(glm::mat4(1.0f), timeSeconds * glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * 
-		glm::scale(glm::mat4(1.0f), glm::vec3(3, 3, 3));
-	ubo.view = glm::lookAt(glm::vec3(0.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	ubo.proj = glm::perspective(glm::radians(45.0f), (float)m_swapchainExtent.width / (float)m_swapchainExtent.height, 0.001f, 10000.0f);
+		glm::scale(glm::mat4(1.0f), glm::vec3(1, 1, 1));
+	ubo.view = glm::lookAt(glm::vec3(0.0f, 1.0f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.proj = glm::perspective(glm::radians(45.0f), (float)m_swapchain.extent.width / (float)m_swapchain.extent.height, 0.001f, 10000.0f);
 
 	// The Vulkan's Y coordinate is flipped from OpenGL (glm design), so we need to invert that
 	ubo.proj[1][1] *= -1;
@@ -1417,10 +1457,10 @@ VulkanRenderer::CreateImage(
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // used only by one queue that supports transfer operations
 	imageInfo.flags = 0; // We might look into this for flags that support sparse image (if we need to do voxel 3D texture for volumetric)
 
-	VkResult result = vkCreateImage(m_device, &imageInfo, nullptr, &image);
-	if (result != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create image");
-	}
+	CheckVulkanResult(
+		vkCreateImage(m_device, &imageInfo, nullptr, &image),
+		"Failed to create image"
+	);
 
 	VkMemoryRequirements memRequirements;
 	vkGetImageMemoryRequirements(m_device, image, &memRequirements);
@@ -1433,13 +1473,15 @@ VulkanRenderer::CreateImage(
 		memPropertyFlags
 		);
 
-	result = vkAllocateMemory(m_device, &memoryAllocInfo, nullptr, &imageMemory);
-	if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to allocate memory for image");
-	}
+	CheckVulkanResult(
+		vkAllocateMemory(m_device, &memoryAllocInfo, nullptr, &imageMemory),
+		"Failed to allocate memory for image"
+		);
 
-	vkBindImageMemory(m_device, image, imageMemory, 0);
+	CheckVulkanResult(
+		vkBindImageMemory(m_device, image, imageMemory, 0),
+		"Failed to bind image memory"
+		);
 }
 
 void 

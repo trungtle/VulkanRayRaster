@@ -91,6 +91,9 @@ private:
 	CreateCommandPool();
 
 	VkResult
+	CreateRayTraceTextureResources();
+
+	VkResult
 	CreateDepthResources();
 
 	VkResult
@@ -314,10 +317,13 @@ private:
 	 * \brief Holds the renderpass object. This also represents the framebuffer attachments
 	 */
 	VkRenderPass m_renderPass;
+	
+	Texture m_depthTexture;
 
-	VkImage m_depthImage;
-	VkImageView m_depthImageView;
-	VkDeviceMemory m_depthImageMemory;
+	/**
+	 * \brief Output of the raytracing compute
+	 */
+	Texture m_rayTracedTexture;
 
 	std::vector<GeometryBuffer> m_geometryBuffers;
 

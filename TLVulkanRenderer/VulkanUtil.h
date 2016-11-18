@@ -11,6 +11,16 @@ using namespace glm;
 
 namespace VulkanUtil
 {
+	inline void CheckVulkanResult(
+		VkResult result,
+		std::string message
+		) 
+	{
+		if(result != VK_SUCCESS) {
+			throw std::runtime_error(message);
+		}
+	}
+
 	// ===================
 	// VERTEX
 	// ===================
@@ -97,6 +107,15 @@ namespace VulkanUtil
 		std::map<EVertexAttributeType, VkDeviceSize> vertexBufferOffsets;
 	} BufferLayout;
 
+	// ===================
+	// TEXTURE
+	// ===================
+	typedef struct TextureTyp
+	{
+		VkImage image;
+		VkImageView imageView;
+		VkDeviceMemory imageMemory;
+	} Texture;
 
 	// ===================
 	// QUEUE
@@ -154,7 +173,7 @@ namespace VulkanUtil
 	} GeometryBuffer;
 
 	// ===================
-	// FUNCTIONS
+	// EXTENSIONS
 	// ===================
 
 	bool
@@ -172,6 +191,9 @@ namespace VulkanUtil
 		const VkPhysicalDevice& physicalDevice
 	);
 
+	// ===================
+	// DEVICE
+	// ===================
 
 	/**
 	* \brief Check if this GPU is Vulkan compatible
@@ -184,11 +206,19 @@ namespace VulkanUtil
 		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
 	);
 
+	// ===================
+	// QUEUE
+	// ===================
+
 	QueueFamilyIndices
 	FindQueueFamilyIndices(
 		const VkPhysicalDevice& physicalDevicece
 		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
 	);
+
+	// ===================
+	// SWAPCHAIN
+	// ===================
 
 	SwapchainSupport
 	QuerySwapchainSupport(
@@ -265,6 +295,10 @@ namespace VulkanUtil
 		, unsigned int desiredWidth = 0 /* unused if useCurrentExtent is true */
 		, unsigned int desiredHeight = 0 /* unused if useCurrentExtent is true */
 	);
+
+	// ===================
+	// IMAGE
+	// ===================
 
 	/**
 	 * \brief Find a supported format from a list of candidates
