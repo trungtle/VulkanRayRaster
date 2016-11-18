@@ -74,7 +74,6 @@ VulkanRenderer::VulkanRenderer(
 	, m_device(VK_NULL_HANDLE)
 	, m_graphicsQueue(VK_NULL_HANDLE)
 	, m_presentQueue(VK_NULL_HANDLE)
-	, m_swapchain(VK_NULL_HANDLE)
 	, m_name("Vulkan Application")
 {
     // -- Initialize logger
@@ -122,7 +121,7 @@ VulkanRenderer::VulkanRenderer(
 
     result = CreateImageViews();
     assert(result == VK_SUCCESS);
-    m_logger->info("Created {} VkImageViews", m_swapchainImageViews.size());
+    m_logger->info("Created {} VkImageViews", m_swapchain.imageViews.size());
 
 	result = CreateRenderPass();
 	assert(result == VK_SUCCESS);
@@ -201,7 +200,7 @@ VulkanRenderer::~VulkanRenderer()
 	vkDestroyBuffer(m_device, m_uniformBuffer, nullptr);
 	
 	vkDestroyCommandPool(m_device, m_graphicsCommandPool, nullptr);
-	for (auto& frameBuffer : m_swapchainFramebuffers) {
+	for (auto& frameBuffer : m_swapchain.framebuffers) {
 		vkDestroyFramebuffer(m_device, frameBuffer, nullptr);
 	}
 	
@@ -210,12 +209,12 @@ VulkanRenderer::~VulkanRenderer()
 	vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, nullptr);
 	
 	vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-	for (auto& imageView : m_swapchainImageViews) {
+	for (auto& imageView : m_swapchain.imageViews) {
         vkDestroyImageView(m_device, imageView, nullptr);
     }
 	vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
 	
-	vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+	vkDestroySwapchainKHR(m_device, m_swapchain.swapchain, nullptr);
 	
 	vkDestroyDevice(m_device, nullptr);
 	
@@ -458,7 +457,7 @@ VulkanRenderer::CreateSwapchain()
 	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	// Create the swap chain now!
-	VkResult result = vkCreateSwapchainKHR(m_device, &swapchainCreateInfo, nullptr, &m_swapchain);
+	VkResult result = vkCreateSwapchainKHR(m_device, &swapchainCreateInfo, nullptr, &m_swapchain.swapchain);
 	if (result != VK_SUCCESS) 
 	{
         throw std::runtime_error("Failed to create swapchain!");
@@ -466,13 +465,13 @@ VulkanRenderer::CreateSwapchain()
 
     // Initialize the vector of swapchain images here. 
     uint32_t imageCount;
-    vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, nullptr);
-    m_swapchainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, m_swapchainImages.data());
+    vkGetSwapchainImagesKHR(m_device, m_swapchain.swapchain, &imageCount, nullptr);
+    m_swapchain.images.resize(imageCount);
+    vkGetSwapchainImagesKHR(m_device, m_swapchain.swapchain, &imageCount, m_swapchain.images.data());
 
     // Initialize other swapchain related fields
-    m_swapchainImageFormat = surfaceFormat.format;
-    m_swapchainExtent = extent;
+    m_swapchain.imageFormat = surfaceFormat.format;
+    m_swapchain.extent = extent;
 
 	return result;
 }
@@ -482,14 +481,14 @@ VulkanRenderer::CreateImageViews()
 {
     VkResult result = VK_SUCCESS;
 
-    m_swapchainImageViews.resize(m_swapchainImages.size());
-    for (auto i = 0; i < m_swapchainImageViews.size(); ++i) {
+    m_swapchain.imageViews.resize(m_swapchain.images.size());
+    for (auto i = 0; i < m_swapchain.imageViews.size(); ++i) {
 		CreateImageView(
-			m_swapchainImages[i],
+			m_swapchain.images[i],
 			VK_IMAGE_VIEW_TYPE_2D,
-			m_swapchainImageFormat,
+			m_swapchain.imageFormat,
 			VK_IMAGE_ASPECT_COLOR_BIT,
-			m_swapchainImageViews[i]
+			m_swapchain.imageViews[i]
 		);
     }
     return result;
@@ -501,7 +500,7 @@ VulkanRenderer::CreateRenderPass()
 	// ----- Specify color attachment ------
 
 	VkAttachmentDescription colorAttachment = {};
-	colorAttachment.format = m_swapchainImageFormat;
+	colorAttachment.format = m_swapchain.imageFormat;
 	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	// What to do with the color attachment before loading rendered content
 	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear to black
@@ -684,14 +683,14 @@ VulkanRenderer::CreateGraphicsPipeline() {
 	VkViewport viewport;
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
-	viewport.width = static_cast<float>(m_swapchainExtent.width);
-	viewport.height = static_cast<float>(m_swapchainExtent.height);
+	viewport.width = static_cast<float>(m_swapchain.extent.width);
+	viewport.height = static_cast<float>(m_swapchain.extent.height);
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
 	VkRect2D scissor = {};
 	scissor.offset = {0, 0};
-	scissor.extent = m_swapchainExtent;
+	scissor.extent = m_swapchain.extent;
 
 	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
 	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -821,23 +820,23 @@ VulkanRenderer::CreateFramebuffers()
 {
 	VkResult result = VK_SUCCESS;
 
-	m_swapchainFramebuffers.resize(m_swapchainImageViews.size());
+	m_swapchain.framebuffers.resize(m_swapchain.imageViews.size());
 
 	// Attach image views to framebuffers
-	for (int i = 0; i < m_swapchainImageViews.size(); ++i)
+	for (int i = 0; i < m_swapchain.imageViews.size(); ++i)
 	{
-		std::array<VkImageView, 2> imageViews = { m_swapchainImageViews[i], m_depthImageView };
+		std::array<VkImageView, 2> imageViews = { m_swapchain.imageViews[i], m_depthTexture.imageView };
 
 		VkFramebufferCreateInfo framebufferCreateInfo = {};
 		framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		framebufferCreateInfo.renderPass = m_renderPass;
 		framebufferCreateInfo.attachmentCount = imageViews.size();
 		framebufferCreateInfo.pAttachments = imageViews.data();
-		framebufferCreateInfo.width = m_swapchainExtent.width;
-		framebufferCreateInfo.height = m_swapchainExtent.height;
+		framebufferCreateInfo.width = m_swapchain.extent.width;
+		framebufferCreateInfo.height = m_swapchain.extent.height;
 		framebufferCreateInfo.layers = 1;
 
-		result = vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &m_swapchainFramebuffers[i]);
+		result = vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &m_swapchain.framebuffers[i]);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create framebuffer");
 			return result;
@@ -872,8 +871,8 @@ VulkanRenderer::CreateDepthResources()
 	VkFormat depthFormat = FindDepthFormat(m_physicalDevice);
 
 	CreateImage(
-		m_swapchainExtent.width,
-		m_swapchainExtent.height,
+		m_swapchain.extent.width,
+		m_swapchain.extent.height,
 		1, // only a 2D depth image
 		VK_IMAGE_TYPE_2D,
 		depthFormat,
@@ -1091,7 +1090,7 @@ VulkanRenderer::CreateDescriptorSet()
 VkResult 
 VulkanRenderer::CreateCommandBuffers()
 {
-	m_commandBuffers.resize(m_swapchainFramebuffers.size());
+	m_commandBuffers.resize(m_swapchain.framebuffers.size());
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = m_graphicsCommandPool;
@@ -1119,11 +1118,11 @@ VulkanRenderer::CreateCommandBuffers()
 		VkRenderPassBeginInfo renderPassBeginInfo = {};
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBeginInfo.renderPass = m_renderPass;
-		renderPassBeginInfo.framebuffer = m_swapchainFramebuffers[i];
+		renderPassBeginInfo.framebuffer = m_swapchain.framebuffers[i];
 
 		// The area where load and store takes place
 		renderPassBeginInfo.renderArea.offset = { 0, 0 };
-		renderPassBeginInfo.renderArea.extent = m_swapchainExtent;
+		renderPassBeginInfo.renderArea.extent = m_swapchain.extent;
 
 		std::array<VkClearValue, 2> clearValues = {};
 		clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -1248,7 +1247,7 @@ VulkanRenderer::Render()
 	uint32_t imageIndex;
 	vkAcquireNextImageKHR(
 		m_device, 
-		m_swapchain, 
+		m_swapchain.swapchain, 
 		60 * 1000000, // Timeout
 		m_imageAvailableSemaphore, 
 		VK_NULL_HANDLE, 
@@ -1287,7 +1286,7 @@ VulkanRenderer::Render()
 	presentInfo.waitSemaphoreCount = 1;
 	presentInfo.pWaitSemaphores = signalSemaphores;
 
-	VkSwapchainKHR swapchains[] = { m_swapchain };
+	VkSwapchainKHR swapchains[] = { m_swapchain.swapchain };
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = swapchains;
 	presentInfo.pImageIndices = &imageIndex;
