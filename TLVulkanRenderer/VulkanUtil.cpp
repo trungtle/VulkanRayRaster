@@ -3,7 +3,7 @@
 #include <cassert>
 #include <GLFW/glfw3.h>
 
-namespace tlVulkanUtil
+namespace VulkanUtil
 {
 	bool
 		CheckValidationLayerSupport(

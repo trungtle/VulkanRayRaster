@@ -13,7 +13,7 @@
 #include "Renderer.h"
 #include "VulkanUtil.h"
 
-using namespace tlVulkanUtil;
+using namespace VulkanUtil;
 
 // ===================
 // VULKAN RENDERER

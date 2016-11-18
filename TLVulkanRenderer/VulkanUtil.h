@@ -9,7 +9,7 @@
 
 using namespace glm;
 
-namespace tlVulkanUtil
+namespace VulkanUtil
 {
 	// ===================
 	// VERTEX
