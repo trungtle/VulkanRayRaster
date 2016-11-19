@@ -2,6 +2,8 @@
 #include <functional>
 
 #include "Application.h"
+#include "VulkanRaytracer.h"
+#include "VulkanRaytracer.h"
 
 static int frame;
 static int fpstracker;
@@ -13,11 +15,13 @@ Application::Application(
 	char **argv,
 	int width,
 	int height,
-    EGraphicsAPI useAPI
+    EGraphicsAPI useAPI,
+	ERenderingMode renderingMode
 	) : 
 	m_width(width), 
 	m_height(height), 
     m_useGraphicsAPI(useAPI),
+	m_renderingMode(renderingMode),
     m_window(nullptr)
 {
 	// Initialize glfw
@@ -25,7 +29,7 @@ Application::Application(
 	
 	// Create window
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	m_window = glfwCreateWindow(m_width, m_height, "Trung's Vulkan rasterizer", nullptr, nullptr);
+	m_window = glfwCreateWindow(m_width, m_height, "Vulkan renderer", nullptr, nullptr);
 
 	// Extra filename
 	std::string inputFilename(argv[1]);
@@ -35,7 +39,12 @@ Application::Application(
     {
         case EGraphicsAPI::Vulkan:
             // Init Vulkan
-            m_renderer = new VulkanRenderer(m_window, m_scene);
+
+			if (m_renderingMode == ERenderingMode::RAYTRACING) {
+				m_renderer = new VulkanRaytracer(m_window, m_scene);
+			} else {
+				m_renderer = new VulkanRenderer(m_window, m_scene);
+			}
             break;
         default:
             std::cout << "Graphics API not supported\n";

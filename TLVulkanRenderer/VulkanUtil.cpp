@@ -156,6 +156,18 @@ namespace VulkanUtil
 				queueFamilyIndices.presentFamily = i;
 			}
 
+			// Query compute queue family
+			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
+			{
+				queueFamilyIndices.computeFamily = i;
+			}
+
+			// Query memory transfer family
+			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)
+			{
+				queueFamilyIndices.transferFamily = i;
+			}
+
 			if (queueFamilyIndices.IsComplete())
 			{
 				break;
@@ -345,4 +357,157 @@ namespace VulkanUtil
 	{
 		return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 	}
+
+	VkDescriptorPoolSize 
+	MakeDescriptorPoolSize(
+		VkDescriptorType type, 
+		uint32_t descriptorCount
+		) 
+	{
+		VkDescriptorPoolSize poolSize = {};
+		poolSize.type = type;
+		poolSize.descriptorCount = descriptorCount;
+
+		return poolSize;
+	}
+
+	VkDescriptorPoolCreateInfo 
+	MakeDescriptorPoolCreateInfo(
+		uint32_t poolSizeCount, 
+		VkDescriptorPoolSize* poolSizes, 
+		uint32_t maxSets
+		) 
+	{
+		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
+		descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		descriptorPoolCreateInfo.poolSizeCount = poolSizeCount;
+		descriptorPoolCreateInfo.pPoolSizes = poolSizes;
+		descriptorPoolCreateInfo.maxSets = maxSets;
+		
+		return descriptorPoolCreateInfo;
+	}
+
+	VkDescriptorSetLayoutBinding 
+	MakeDescriptorSetLayoutBinding(
+		uint32_t binding, 
+		VkDescriptorType descriptorType, 
+		VkShaderStageFlags shaderFlags,
+		uint32_t descriptorCount
+		)
+	{
+		VkDescriptorSetLayoutBinding layoutBinding = {};
+		layoutBinding.binding = binding;
+		layoutBinding.descriptorType = descriptorType;
+		layoutBinding.stageFlags = shaderFlags;
+		layoutBinding.descriptorCount = descriptorCount;
+
+		return layoutBinding;
+	}
+
+	VkDescriptorSetLayoutCreateInfo 
+	MakeDescriptorSetLayoutCreateInfo(
+		VkDescriptorSetLayoutBinding* bindings, 
+		uint32_t bindingCount
+		) 
+	{
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = bindingCount;
+		layoutInfo.pBindings = bindings;
+
+		return layoutInfo;
+	}
+
+	VkDescriptorSetAllocateInfo 
+	MakeDescriptorSetAllocateInfo(
+		VkDescriptorPool descriptorPool, 
+		VkDescriptorSetLayout* descriptorSetLayout, 
+		uint32_t descriptorSetCount
+		) 
+	{
+
+		VkDescriptorSetAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = descriptorPool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = descriptorSetLayout;
+
+		return allocInfo;
+
+	}
+
+	VkDescriptorBufferInfo 
+	MakeDescriptorBufferInfo(
+		VkBuffer buffer, 
+		VkDeviceSize offset, 
+		VkDeviceSize range
+		) 
+	{
+		VkDescriptorBufferInfo descriptorBufferInfo = {};
+		descriptorBufferInfo.buffer = buffer;
+		descriptorBufferInfo.offset = offset;
+		descriptorBufferInfo.range = range;
+
+		return descriptorBufferInfo;
+	}
+
+	VkWriteDescriptorSet 
+	MakeWriteDescriptorSet(
+		VkDescriptorType type, 
+		VkDescriptorSet dstSet, 
+		uint32_t dstBinding, 
+		uint32_t descriptorCount, 
+		VkDescriptorBufferInfo* bufferInfo,
+		VkDescriptorImageInfo* imageInfo
+		) 
+	{
+		VkWriteDescriptorSet writeDescriptorSet = {};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = dstSet;
+		writeDescriptorSet.dstBinding = dstBinding;
+		writeDescriptorSet.dstArrayElement = 0; // descriptor set could be an array
+		writeDescriptorSet.descriptorType = type;
+		writeDescriptorSet.descriptorCount = descriptorCount;
+		writeDescriptorSet.pBufferInfo = bufferInfo;
+		writeDescriptorSet.pImageInfo = imageInfo;
+
+		return writeDescriptorSet;
+	}
+
+	VkPipelineLayoutCreateInfo 
+	MakePipelineLayoutCreateInfo(
+		VkDescriptorSetLayout* descriptorSetLayouts, 
+		uint32_t setLayoutCount
+		) 
+	{
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
+		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutCreateInfo.setLayoutCount = setLayoutCount;
+		pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts;
+		return pipelineLayoutCreateInfo;
+	}
+
+	void
+	MakeDefaultTextureSampler(
+		const VkDevice& device,
+		VkSampler* sampler
+		)
+	{
+		VkSamplerCreateInfo samplerCreateInfo = {};
+		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		samplerCreateInfo.mipLodBias = 0.0f;
+		samplerCreateInfo.maxAnisotropy = 0;
+		CheckVulkanResult(
+			vkCreateSampler(device, &samplerCreateInfo, nullptr, sampler),
+			"Failed to create texture sampler"
+		);
+	}
+
+
 }

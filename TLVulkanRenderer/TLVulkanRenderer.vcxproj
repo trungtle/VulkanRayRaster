@@ -154,6 +154,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="Utilities.cpp" />
+    <ClCompile Include="VulkanRaytracer.cpp" />
     <ClCompile Include="VulkanRenderer.cpp" />
     <ClCompile Include="VulkanUtil.cpp" />
   </ItemGroup>
@@ -174,11 +175,15 @@
     <ClInclude Include="thirdparty\spdlog\include\spdlog\spdlog.h" />
     <ClInclude Include="thirdparty\spdlog\include\spdlog\tweakme.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="VulkanRaytracer.h" />
     <ClInclude Include="VulkanRenderer.h" />
     <ClInclude Include="VulkanUtil.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\fragShader.frag" />
+    <None Include="shaders\raytracing\raytrace.comp" />
+    <None Include="shaders\raytracing\texture.frag" />
+    <None Include="shaders\raytracing\texture.vert" />
     <None Include="shaders\vertShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

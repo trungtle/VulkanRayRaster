@@ -90,32 +90,110 @@ namespace VulkanUtil
 	// UNIFORM
 	// ===================
 
-	typedef struct UniformBufferObjectTyp
+	struct UniformBufferObject
 	{
 		glm::mat4 model;
 		glm::mat4 view;
 		glm::mat4 proj;
-	} UniformBufferObject;
+	};
 
 	// ===================
 	// BUFFER
 	// ===================
 
-	typedef struct BufferLayoutTyp
+	struct GeometryBufferOffset
 	{
-		VkDeviceSize indexBufferOffset;
 		std::map<EVertexAttributeType, VkDeviceSize> vertexBufferOffsets;
-	} BufferLayout;
+	};
+
+	struct StorageBuffer {
+		VkBuffer buffer;
+		VkDescriptorBufferInfo descriptor;
+	};
+
+	// ===================
+	// DESCRIPTOR
+	// ===================
+	
+	VkDescriptorPoolSize
+	MakeDescriptorPoolSize(
+		VkDescriptorType descriptorType,
+		uint32_t descriptorCount
+	);
+
+	VkDescriptorPoolCreateInfo
+	MakeDescriptorPoolCreateInfo(
+		uint32_t poolSizeCount,
+		VkDescriptorPoolSize* poolSizes,
+		uint32_t maxSets = 1
+	);
+
+	VkDescriptorSetLayoutBinding
+	MakeDescriptorSetLayoutBinding(
+		uint32_t binding,
+		VkDescriptorType descriptorType,
+		VkShaderStageFlags shaderFlags,
+		uint32_t descriptorCount = 1
+		);
+
+	VkDescriptorSetLayoutCreateInfo
+	MakeDescriptorSetLayoutCreateInfo(
+		VkDescriptorSetLayoutBinding* bindings,
+		uint32_t bindingCount = 1
+	);
+
+	VkDescriptorSetAllocateInfo
+	MakeDescriptorSetAllocateInfo(
+		VkDescriptorPool descriptorPool,
+		VkDescriptorSetLayout* descriptorSetLayout,
+		uint32_t descriptorSetCount = 1
+	);
+
+	VkDescriptorBufferInfo
+	MakeDescriptorBufferInfo(
+		VkBuffer buffer,
+		VkDeviceSize offset,
+		VkDeviceSize range
+	);
+
+	VkWriteDescriptorSet
+	MakeWriteDescriptorSet(
+		VkDescriptorType type,
+		VkDescriptorSet dstSet,
+		uint32_t dstBinding,
+		uint32_t descriptorCount,
+		VkDescriptorBufferInfo* bufferInfo,
+		VkDescriptorImageInfo* imageInfo
+	);
+
+	// ===================
+	// PIPELINE
+	// ===================
+	VkPipelineLayoutCreateInfo
+	MakePipelineLayoutCreateInfo(
+		VkDescriptorSetLayout* descriptorSetLayouts,
+		uint32_t setLayoutCount = 1
+	);
 
 	// ===================
 	// TEXTURE
 	// ===================
 	typedef struct TextureTyp
 	{
+		int width;
+		int height;
 		VkImage image;
 		VkImageView imageView;
 		VkDeviceMemory imageMemory;
+		VkSampler sampler;
+		VkDescriptorImageInfo descriptor;
 	} Texture;
+
+	void 
+	MakeDefaultTextureSampler(
+		const VkDevice& device,
+		VkSampler* sampler
+	);
 
 	// ===================
 	// QUEUE
@@ -128,11 +206,19 @@ namespace VulkanUtil
 	{
 		int graphicsFamily = -1;
 		int presentFamily = -1;
+		int computeFamily = -1;
+		int transferFamily = -1;
 
 		bool IsComplete() const {
-			return graphicsFamily >= 0 && presentFamily >= 0;
+			return graphicsFamily >= 0 && presentFamily >= 0 && computeFamily >= 0 && transferFamily >= 0;
 		}
 	} QueueFamilyIndices;
+
+	QueueFamilyIndices
+		FindQueueFamilyIndices(
+			const VkPhysicalDevice& physicalDevicece
+			, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
+		);
 
 	// ===================
 	// SWAPCHAIN SUPPORT
@@ -159,7 +245,7 @@ namespace VulkanUtil
 		/**
 		* \brief Byte offsets for vertex attributes and resource buffers into our unified buffer
 		*/
-		BufferLayout bufferLayout;
+		GeometryBufferOffset bufferLayout;
 
 		/**
 		* \brief Handle to the vertex buffers
@@ -203,16 +289,6 @@ namespace VulkanUtil
 	bool 
 	IsDeviceVulkanCompatible(
 		const VkPhysicalDevice& physicalDeivce
-		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
-	);
-
-	// ===================
-	// QUEUE
-	// ===================
-
-	QueueFamilyIndices
-	FindQueueFamilyIndices(
-		const VkPhysicalDevice& physicalDevicece
 		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
 	);
 

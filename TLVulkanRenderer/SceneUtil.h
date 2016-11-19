@@ -2,6 +2,10 @@
 
 typedef unsigned char Byte;
 
+// ---------
+// VERTEX
+// ----------
+
 typedef enum
 {
 	INDEX,
@@ -9,7 +13,6 @@ typedef enum
 	NORMAL,
 	TEXCOORD
 } EVertexAttributeType;
-
 
 typedef struct VertexAttributeInfoTyp
 {
@@ -20,6 +23,31 @@ typedef struct VertexAttributeInfoTyp
 
 } VertexAttributeInfo;
 
+// ---------
+// GEOMETRY
+// ----------
+
+typedef struct GeometryDataTyp
+{
+	std::map<EVertexAttributeType, std::vector<Byte>> vertexData;
+	std::map<EVertexAttributeType, VertexAttributeInfo> vertexAttributes;
+} GeometryData;
+
+struct Triangle
+{
+	int materialid;
+	glm::vec3 vert0; 
+	glm::vec3 vert1; 
+	glm::vec3 vert2; 
+	glm::vec3 norm0; 
+	glm::vec3 norm1; 
+	glm::vec3 norm2; 
+};
+
+// ---------
+// MATERIAL
+// ----------
+
 typedef struct MaterialTyp
 {
 	glm::vec4 diffuse;
@@ -29,5 +57,6 @@ typedef struct MaterialTyp
 	float shininess;
 	float transparency;
 } Material;
+
 
 

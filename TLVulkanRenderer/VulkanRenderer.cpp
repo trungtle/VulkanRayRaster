@@ -88,7 +88,7 @@ VulkanRenderer::VulkanRenderer(
 
     // -- Initialize Vulkan
 
-	VkResult result = CreateInstance();
+	VkResult result = InitializeVulkanInstance();
 	assert(result == VK_SUCCESS);
     m_logger->info<std::string>("Initalizes Vulkan instance");
 
@@ -115,63 +115,59 @@ VulkanRenderer::VulkanRenderer(
 	assert(result == VK_SUCCESS);
     m_logger->info<std::string>("Setup logical device");
 
-	result = CreateSwapchain();
+	result = PrepareSwapchain();
 	assert(result == VK_SUCCESS);
     m_logger->info<std::string>("Created swapchain");
 
-    result = CreateImageViews();
+    result = PrepareImageViews();
     assert(result == VK_SUCCESS);
     m_logger->info("Created {} VkImageViews", m_swapchain.imageViews.size());
 
-	result = CreateRenderPass();
+	result = PrepareRenderPass();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created renderpass");
 
-	result = CreateDescriptorSetLayout();
+	result = PrepareDescriptorSetLayout();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created descriptor set layout");
 
-	result = CreateGraphicsPipeline();
+	result = PrepareGraphicsPipeline();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created graphics pipeline");
 
-	result = CreateCommandPool();
+	result = PrepareCommandPool();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created command pool");
 
-	result = CreateDepthResources();
+	result = PrepareDepthResources();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created depth image");
 
-	result = CreateRayTraceTextureResources();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Create ray trace texture resources");
-
-	result = CreateFramebuffers();
+	result = PrepareFramebuffers();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created framebuffers");
 
-	result = CreateVertexBuffer();
+	result = PrepareVertexBuffer();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created vertex buffer");
 
-	result = CreateUniformBuffer();
+	result = PrepareUniformBuffer();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created uniform buffer");
 
-	result = CreateDescriptorPool();
+	result = PrepareDescriptorPool();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created descriptor pool");
 
-	result = CreateDescriptorSet();
+	result = PrepareGraphicsDescriptorSet();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created descriptor set");
 
-	result = CreateCommandBuffers();
+	result = PrepareGraphicsCommandBuffers();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created command buffers");
 
-	result = CreateSemaphores();
+	result = PrepareSemaphores();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created semaphores");
 
@@ -230,7 +226,7 @@ VulkanRenderer::~VulkanRenderer()
 }
 
 VkResult 
-VulkanRenderer::CreateInstance() 
+VulkanRenderer::InitializeVulkanInstance() 
 {	
 	// Create application info struct
 	VkApplicationInfo appInfo = {};
@@ -374,7 +370,7 @@ VulkanRenderer::SetupLogicalDevice()
 }
 
 VkResult
-VulkanRenderer::CreateSwapchain()
+VulkanRenderer::PrepareSwapchain()
 {
 	// Query existing support
 	SwapchainSupport swapchainSupport = QuerySwapchainSupport(m_physicalDevice, m_surfaceKHR);
@@ -481,7 +477,7 @@ VulkanRenderer::CreateSwapchain()
 }
 
 VkResult 
-VulkanRenderer::CreateImageViews() 
+VulkanRenderer::PrepareImageViews() 
 {
     VkResult result = VK_SUCCESS;
 
@@ -499,7 +495,7 @@ VulkanRenderer::CreateImageViews()
 }
 
 VkResult 
-VulkanRenderer::CreateRenderPass() 
+VulkanRenderer::PrepareRenderPass() 
 {
 	// ----- Specify color attachment ------
 
@@ -582,7 +578,7 @@ VulkanRenderer::CreateRenderPass()
 }
 
 VkResult 
-VulkanRenderer::CreateDescriptorSetLayout() 
+VulkanRenderer::PrepareDescriptorSetLayout() 
 {
 	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
 	uboLayoutBinding.binding = 0;
@@ -605,7 +601,7 @@ VulkanRenderer::CreateDescriptorSetLayout()
 }
 
 VkResult 
-VulkanRenderer::CreateGraphicsPipeline() {
+VulkanRenderer::PrepareGraphicsPipeline() {
 	
 	VkResult result = VK_SUCCESS;
 
@@ -620,13 +616,13 @@ VulkanRenderer::CreateGraphicsPipeline() {
 	
 	// Create shader modules from bytecodes
 	VkShaderModule vertShader;
-	CreateShaderModule(
+	PrepareShaderModule(
 		vertShaderBytecode,
 		vertShader
 		);
 
 	VkShaderModule fragShader;
-	CreateShaderModule(
+	PrepareShaderModule(
 		fragShaderBytecode,
 		fragShader
 	);
@@ -771,15 +767,12 @@ VulkanRenderer::CreateGraphicsPipeline() {
 	// 8. Dynamic state. Some pipeline states can be updated dynamically. Skip for now.
 
 	// 9. Create pipeline layout to hold uniforms. This can be modified dynamically. 
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
-	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutCreateInfo.setLayoutCount = 1;
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = MakePipelineLayoutCreateInfo(&m_descriptorSetLayout);
 	pipelineLayoutCreateInfo.pSetLayouts = &m_descriptorSetLayout;
-	result = vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout);
-	if (result != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create pipeline layout.");
-		return result;
-	}
+	CheckVulkanResult(
+		vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout),
+		"Failed to create pipeline layout."
+		);
 
 	// Finally, create our graphics pipeline here!
 	VkPipelineShaderStageCreateInfo createInfos[2] = { vertShaderStageCreateInfo, fragShaderStageCreateInfo };
@@ -820,7 +813,14 @@ VulkanRenderer::CreateGraphicsPipeline() {
 }
 
 VkResult 
-VulkanRenderer::CreateFramebuffers() 
+VulkanRenderer::PrepareComputePipeline() 
+{
+
+	return VK_SUCCESS;
+}
+
+VkResult 
+VulkanRenderer::PrepareFramebuffers() 
 {
 	VkResult result = VK_SUCCESS;
 
@@ -851,7 +851,7 @@ VulkanRenderer::CreateFramebuffers()
 }
 
 VkResult 
-VulkanRenderer::CreateCommandPool() 
+VulkanRenderer::PrepareCommandPool() 
 {
 	VkResult result = VK_SUCCESS;
 
@@ -870,44 +870,7 @@ VulkanRenderer::CreateCommandPool()
 }
 
 VkResult 
-VulkanRenderer::CreateRayTraceTextureResources() 
-{
-	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
-
-	CreateImage(
-		m_swapchain.extent.width,
-		m_swapchain.extent.height,
-		1, // only a 2D depth image
-		VK_IMAGE_TYPE_2D,
-		imageFormat,
-		VK_IMAGE_TILING_OPTIMAL,
-		// Image is sampled in fragment shader and used as storage for compute output
-		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_rayTracedTexture.image,
-		m_rayTracedTexture.imageMemory
-	);
-	CreateImageView(
-		m_rayTracedTexture.image,
-		VK_IMAGE_VIEW_TYPE_2D,
-		imageFormat,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_rayTracedTexture.imageView
-	);
-
-	TransitionImageLayout(
-		m_rayTracedTexture.image,
-		imageFormat,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-	);
-
-	return VK_SUCCESS;
-}
-
-VkResult 
-VulkanRenderer::CreateDepthResources() 
+VulkanRenderer::PrepareDepthResources() 
 {
 	VkFormat depthFormat = FindDepthFormat(m_physicalDevice);
 
@@ -943,7 +906,7 @@ VulkanRenderer::CreateDepthResources()
 }
 
 VkResult 
-VulkanRenderer::CreateVertexBuffer()
+VulkanRenderer::PrepareVertexBuffer()
 {
 	for (GeometryData* geomData : m_scene->m_geometriesData)
 	{
@@ -962,7 +925,7 @@ VulkanRenderer::CreateVertexBuffer()
 		VkDeviceSize normalBufferOffset = positionBufferOffset + positionBufferSize;
 
 		VkDeviceSize bufferSize = indexBufferSize + positionBufferSize + normalBufferSize;
-		geomBuffer.bufferLayout.indexBufferOffset = indexBufferOffset;
+		geomBuffer.bufferLayout.vertexBufferOffsets.insert(std::make_pair(INDEX, indexBufferOffset));
 		geomBuffer.bufferLayout.vertexBufferOffsets.insert(std::make_pair(POSITION, positionBufferOffset));
 		geomBuffer.bufferLayout.vertexBufferOffsets.insert(std::make_pair(NORMAL, normalBufferOffset));
 
@@ -1030,7 +993,7 @@ VulkanRenderer::CreateVertexBuffer()
 
 
 VkResult 
-VulkanRenderer::CreateUniformBuffer()
+VulkanRenderer::PrepareUniformBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 	VkDeviceSize memoryOffset = 0;
@@ -1070,66 +1033,50 @@ VulkanRenderer::CreateUniformBuffer()
 }
 
 VkResult 
-VulkanRenderer::CreateDescriptorPool() 
+VulkanRenderer::PrepareDescriptorPool() 
 {
-	VkDescriptorPoolSize poolSize = {};
-	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSize.descriptorCount = 1;
+	VkDescriptorPoolSize poolSize = MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
 
-	VkDescriptorPoolCreateInfo poolCreateInfo = {};
-	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolCreateInfo.poolSizeCount = 1;
-	poolCreateInfo.pPoolSizes = &poolSize;
-	poolCreateInfo.maxSets = 1;
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = MakeDescriptorPoolCreateInfo(1, &poolSize, 1);
 
-	VkResult result = vkCreateDescriptorPool(m_device, &poolCreateInfo, nullptr, &m_descriptorPool);
-	if (result != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create descriptor pool");
-		return result;
-	}
+	CheckVulkanResult(
+		vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &m_descriptorPool),
+		"Failed to create descriptor pool"
+	);
 
-	return result;
+	return VK_SUCCESS;
 }
 
 VkResult 
-VulkanRenderer::CreateDescriptorSet() 
+VulkanRenderer::PrepareGraphicsDescriptorSet() 
 {
 	
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = m_descriptorPool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &m_descriptorSetLayout;
+	VkDescriptorSetAllocateInfo allocInfo = MakeDescriptorSetAllocateInfo(m_descriptorPool, &m_descriptorSetLayout);
 
-	VkResult result = vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet);
-	if (result != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create descriptor set");
-		return result;
-	}
+	CheckVulkanResult(
+		vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet),
+		"Failed to allocate descriptor set"
+	);
 
-	VkDescriptorBufferInfo bufferInfo = {};
-	bufferInfo.buffer = m_uniformBuffer;
-	bufferInfo.offset = 0;
-	bufferInfo.range = sizeof(UniformBufferObject);
+	VkDescriptorBufferInfo bufferInfo = MakeDescriptorBufferInfo(m_uniformBuffer, 0, sizeof(UniformBufferObject));
 
 	// Update descriptor set info
-	VkWriteDescriptorSet descriptorWrite = {};
-	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstSet = m_descriptorSet;
-	descriptorWrite.dstBinding = 0;
-	descriptorWrite.dstArrayElement = 0; // descriptor set could be an array
-	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorWrite.descriptorCount = 1;
-	descriptorWrite.pBufferInfo = &bufferInfo;
+	VkWriteDescriptorSet descriptorWrite = MakeWriteDescriptorSet(
+		VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		m_descriptorSet,
+		0,
+		1,
+		&bufferInfo,
+		nullptr
+		);
 
 	vkUpdateDescriptorSets(m_device, 1, &descriptorWrite, 0, nullptr);
 
-
-	return result;
+	return VK_SUCCESS;
 }
 
 VkResult 
-VulkanRenderer::CreateCommandBuffers()
+VulkanRenderer::PrepareGraphicsCommandBuffers()
 {
 	m_commandBuffers.resize(m_swapchain.framebuffers.size());
 	VkCommandBufferAllocateInfo allocInfo = {};
@@ -1187,7 +1134,7 @@ VulkanRenderer::CreateCommandBuffers()
 			vkCmdBindVertexBuffers(m_commandBuffers[i], 0, 2, vertexBuffers, offsets);
 
 			// Bind index buffer
-			vkCmdBindIndexBuffer(m_commandBuffers[i], geomBuffer.vertexBuffer, geomBuffer.bufferLayout.indexBufferOffset, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(m_commandBuffers[i], geomBuffer.vertexBuffer, geomBuffer.bufferLayout.vertexBufferOffsets.at(INDEX), VK_INDEX_TYPE_UINT16);
 
 			// Bind uniform buffer
 			vkCmdBindDescriptorSets(m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
@@ -1211,7 +1158,7 @@ VulkanRenderer::CreateCommandBuffers()
 }
 
 VkResult 
-VulkanRenderer::CreateSemaphores() 
+VulkanRenderer::PrepareSemaphores() 
 {
 	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1233,7 +1180,7 @@ VulkanRenderer::CreateSemaphores()
 }
 
 VkResult
-VulkanRenderer::CreateShaderModule(
+VulkanRenderer::PrepareShaderModule(
 	const std::vector<char>& code
 	, VkShaderModule& shaderModule
 )
@@ -1568,6 +1515,11 @@ VulkanRenderer::TransitionImageLayout(
 		newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
 		imageBarrier.srcAccessMask = 0;
 		imageBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	} else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+		newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+	{
+		imageBarrier.srcAccessMask = 0;
+		imageBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 	} else {
 		throw std::invalid_argument("Unsupported layout transition");
 	}

@@ -29,18 +29,18 @@ public:
 		GLFWwindow* window,
 		Scene* scene
 		);
-	virtual 
-    ~VulkanRenderer() final;
+
+	virtual ~VulkanRenderer() override;
 
 	virtual void
-	Update() final;
+	Update() override;
 
     virtual void
-    Render() final;
+    Render() override;
 
-private:
+protected:
 	VkResult 
-	CreateInstance();
+	InitializeVulkanInstance();
 	
 	VkResult 
 	SetupDebugCallback();
@@ -55,64 +55,85 @@ private:
 	SetupLogicalDevice();
 
 	VkResult
-	CreateSwapchain();
+	PrepareSwapchain();
 
     VkResult
-    CreateImageViews();
+    PrepareImageViews();
 
 	VkResult
-	CreateRenderPass();
+	PrepareRenderPass();
 
-	VkResult
-	CreateDescriptorSetLayout();
+	// ----------------
+	// PIPELINES
+	// ----------------
 
 	/**
 	 * \brief The graphics pipeline are often fixed. Create a new pipeline if we need a different pipeline settings
 	 * \return 
 	 */
-	VkResult
-	CreateGraphicsPipeline();
+	virtual VkResult
+	PrepareGraphicsPipeline();
+
+	virtual VkResult
+	PrepareComputePipeline();
 
 	VkResult
-	CreateShaderModule(
+	PrepareShaderModule(
 		const std::vector<char>& code
 		, VkShaderModule& shaderModule
 		);
 
 	VkResult
-	CreateFramebuffers();
+	PrepareFramebuffers();
 
+	VkResult
+	PrepareDepthResources();
+
+	VkResult
+	PrepareVertexBuffer();
+
+	VkResult
+	PrepareUniformBuffer();
+
+	// -----------
+	// DESCRIPTOR
+	// -----------
+
+	virtual VkResult
+	PrepareDescriptorPool();
+
+	VkResult
+	PrepareGraphicsDescriptorSet();
+
+	VkResult
+	PrepareDescriptorSetLayout();
+
+	// --------------
+	// COMMAND BUFFERS
+	// ---------------
+	
 	/**
-	 * \brief Vulkan commands are created in advance and submitted to the queue, 
-	 *        instead of using direct function calls.
-	 * \return 
-	 */
+	* \brief Vulkan commands are created in advance and submitted to the queue,
+	*        instead of using direct function calls.
+	* \return
+	*/
 	VkResult
-	CreateCommandPool();
+	PrepareCommandPool();
+
+	virtual VkResult
+	PrepareGraphicsCommandBuffers();
+
+	virtual VkResult
+	PrepareComputeCommandBuffers() {
+		return VK_SUCCESS;
+	};
+
+	// ----------------
+	// SYCHRONIZATION
+	// ----------------
 
 	VkResult
-	CreateRayTraceTextureResources();
-
-	VkResult
-	CreateDepthResources();
-
-	VkResult
-	CreateVertexBuffer();
-
-	VkResult
-	CreateUniformBuffer();
-
-	VkResult
-	CreateDescriptorPool();
-
-	VkResult
-	CreateDescriptorSet();
-
-	VkResult
-	CreateCommandBuffers();
-
-	VkResult
-	CreateSemaphores();
+	PrepareSemaphores();
 
 	/**
 	* \brief Helper to determine the memory type to allocate from our graphics card
@@ -319,11 +340,6 @@ private:
 	VkRenderPass m_renderPass;
 	
 	Texture m_depthTexture;
-
-	/**
-	 * \brief Output of the raytracing compute
-	 */
-	Texture m_rayTracedTexture;
 
 	std::vector<GeometryBuffer> m_geometryBuffers;
 

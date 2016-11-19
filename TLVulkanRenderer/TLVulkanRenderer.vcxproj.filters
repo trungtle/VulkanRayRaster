@@ -42,6 +42,9 @@
     <ClCompile Include="VulkanUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VulkanRaytracer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">
@@ -98,9 +101,25 @@
     <ClInclude Include="SceneUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VulkanRaytracer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\fragShader.frag" />
-    <None Include="shaders\vertShader.vert" />
+    <None Include="shaders\fragShader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="shaders\vertShader.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="shaders\raytracing\raytrace.comp">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="shaders\raytracing\texture.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="shaders\raytracing\texture.vert">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
