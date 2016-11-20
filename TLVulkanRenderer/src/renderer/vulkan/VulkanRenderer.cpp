@@ -80,7 +80,7 @@ VulkanRenderer::VulkanRenderer(
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created uniform buffer");
 
-	result = PrepareGraphicsDescriptorSet();
+	result = PrepareGraphicsDescriptorSets();
 	assert(result == VK_SUCCESS);
 	m_logger->info<std::string>("Created descriptor set");
 
@@ -104,7 +104,7 @@ VulkanRenderer::~VulkanRenderer()
 	
 	vkFreeCommandBuffers(m_vulkanDevice->device, graphics.m_graphicsCommandPool, graphics.m_commandBuffers.size(), graphics.m_commandBuffers.data());
 	
-	vkDestroyDescriptorPool(m_vulkanDevice->device, graphics.m_descriptorPool, nullptr);
+	vkDestroyDescriptorPool(m_vulkanDevice->device, graphics.descriptorPool, nullptr);
 
 	vkDestroyImageView(m_vulkanDevice->device, graphics.m_depthTexture.imageView, nullptr);
 	vkDestroyImage(m_vulkanDevice->device, graphics.m_depthTexture.image, nullptr);
@@ -127,9 +127,9 @@ VulkanRenderer::~VulkanRenderer()
 	
 	vkDestroyRenderPass(m_vulkanDevice->device, graphics.m_renderPass, nullptr);
 	
-	vkDestroyDescriptorSetLayout(m_vulkanDevice->device, graphics.m_descriptorSetLayout, nullptr);
+	vkDestroyDescriptorSetLayout(m_vulkanDevice->device, graphics.descriptorSetLayout, nullptr);
 	
-	vkDestroyPipelineLayout(m_vulkanDevice->device, graphics.m_pipelineLayout, nullptr);
+	vkDestroyPipelineLayout(m_vulkanDevice->device, graphics.pipelineLayout, nullptr);
 	for (auto& imageView : m_vulkanDevice->m_swapchain.imageViews) {
         vkDestroyImageView(m_vulkanDevice->device, imageView, nullptr);
     }
@@ -245,18 +245,22 @@ VulkanRenderer::PrepareRenderPass()
 VkResult 
 VulkanRenderer::PrepareDescriptorSetLayout() 
 {
-	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-	uboLayoutBinding.binding = 0;
-	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboLayoutBinding.descriptorCount = 1;
-	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+		// Binding 0: Fragment shader image sampler
+		MakeDescriptorSetLayoutBinding(
+			0,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			VK_SHADER_STAGE_VERTEX_BIT
+		),
+	};
 
-	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = 1;
-	layoutInfo.pBindings = &uboLayoutBinding;
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo =
+		MakeDescriptorSetLayoutCreateInfo(
+			setLayoutBindings.data(),
+			setLayoutBindings.size()
+		);
 
-	VkResult result = vkCreateDescriptorSetLayout(m_vulkanDevice->device, &layoutInfo, nullptr, &graphics.m_descriptorSetLayout);
+	VkResult result = vkCreateDescriptorSetLayout(m_vulkanDevice->device, &descriptorSetLayoutCreateInfo, nullptr, &graphics.descriptorSetLayout);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create descriptor set layout");
 		return result;
@@ -273,41 +277,14 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 	// Load SPIR-V bytecode
 	// The SPIR_V files can be compiled by running glsllangValidator.exe from the VulkanSDK or
 	// by invoking the custom script shaders/compileShaders.bat
-	
-	// -- Load vertex shader
 	VkShaderModule vertShader;
-	PrepareShaderModule(
-		"shaders/vert.spv",
-		vertShader
-	);
-	m_logger->info("Loaded {} vertex shader", "shaders/vert.spv");
-
-	// -- Load fragment shader
+	PrepareShaderModule("shaders/vert.spv", vertShader);
 	VkShaderModule fragShader;
-	PrepareShaderModule(
-		"shaders/frag.spv",
-		fragShader
-	);
-	m_logger->info("Loaded {} frag shader", "shaders/frag.spv");
+	PrepareShaderModule("shaders/frag.spv", fragShader);
 
-
-	// -- Setup the programmable stages for the pipeline. This links the shader modules with their corresponding stages.
-	// \ref https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineShaderStageCreateInfo
-	VkPipelineShaderStageCreateInfo vertShaderStageCreateInfo = MakePipelineShaderStageCreateInfo(
-		VK_SHADER_STAGE_VERTEX_BIT,
-		vertShader
-		);
-	
-	VkPipelineShaderStageCreateInfo fragShaderStageCreateInfo = MakePipelineShaderStageCreateInfo(
-		VK_SHADER_STAGE_FRAGMENT_BIT,
-		fragShader
-		);
-
-	// -- Setup the fixed functions stages for the pipeline.
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineVertexInputStateCreateInfo
 	// 1. Vertex input stage
-	VkPipelineVertexInputStateCreateInfo vertexInputStageCreateInfo = {};
-	vertexInputStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	VkPipelineVertexInputStateCreateInfo vertexInputStageCreateInfo = MakePipelineVertexInputStateCreateInfo();
 	
 	// Input binding description
 	VkVertexInputBindingDescription bindingDesc[2] = {
@@ -324,10 +301,8 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 
 	// 2. Input assembly
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineInputAssemblyStateCreateInfo
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
-	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE; // If true, we can break up primitives like triangels and lines using a special index 0xFFFF
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = 
+		MakePipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
 	// 3. Skip tesselation 
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineTessellationStateCreateInfo
@@ -336,130 +311,103 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 	// 4. Viewports and scissors
 	// Viewport typically just covers the entire swapchain extent
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineViewportStateCreateInfo
-	VkViewport viewport;
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = static_cast<float>(m_vulkanDevice->m_swapchain.extent.width);
-	viewport.height = static_cast<float>(m_vulkanDevice->m_swapchain.extent.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
+	std::vector<VkViewport> viewports = {
+		MakeFullscreenViewport(m_vulkanDevice->m_swapchain.extent)
+	};
 
 	VkRect2D scissor = {};
-	scissor.offset = {0, 0};
+	scissor.offset = { 0, 0 };
 	scissor.extent = m_vulkanDevice->m_swapchain.extent;
 
-	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
-	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportStateCreateInfo.viewportCount = 1;
-	viewportStateCreateInfo.pViewports = &viewport;
-	viewportStateCreateInfo.scissorCount = 1;
-	viewportStateCreateInfo.pScissors = &scissor;
+	std::vector<VkRect2D> scissors = {
+		scissor
+	};
+
+	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = MakePipelineViewportStateCreateInfo(viewports, scissors);
 
 	// 5. Rasterizer
 	// This stage converts primitives into fragments. It also performs depth/stencil testing, face culling, scissor test.
-	// Rasterization state can be affected by three things: 
-	// - VkPipelineRasterizationStateCreateInfo
-	// - VkPipelineMultisampleStateCreateInfo 
-	// - VkPipelineDepthStencilStateCreateInfo
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineRasterizationStateCreateInfo 
-
-	VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
-	rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	// If enabled, fragments beyond near and far planes are clamped instead of discarded
-	rasterizationStateCreateInfo.depthClampEnable = VK_FALSE; 
-	// If enabled, geometry won't pass through rasterization. This would be useful for transform feedbacks
-	// where we don't need to go through the fragment shader
-	rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
-	rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL; // fill, line, or point
-	rasterizationStateCreateInfo.lineWidth = 1.0f;
-	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
-	rasterizationStateCreateInfo.depthBiasClamp = 0.0f;
-	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
-	rasterizationStateCreateInfo.depthBiasSlopeFactor = 0.0f;
+	VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = MakePipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
 	// 6. Multisampling state. We're not doing anything special here for now
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineMultisampleStateCreateInfo
 
-	VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = {};
-	multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;
-	multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	multisampleStateCreateInfo.minSampleShading = 1.0f;
-	multisampleStateCreateInfo.pSampleMask = nullptr;
-	multisampleStateCreateInfo.alphaToCoverageEnable = VK_FALSE;
-	multisampleStateCreateInfo.alphaToOneEnable = VK_FALSE;
+	VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = 
+		MakePipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
 
 	// 6. Depth/stecil tests state
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineDepthStencilStateCreateInfo
-	VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = {};
-	depthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
-	depthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS; // 1.0f is farthest, 0.0f is closest
-	depthStencilStateCreateInfo.depthWriteEnable = VK_TRUE; // Allowing for transparent objects
-	depthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE; // Allowing to keep fragment falling withn a  certain range
-	depthStencilStateCreateInfo.minDepthBounds = 0.0f;
-	depthStencilStateCreateInfo.maxDepthBounds = 1.0f;
-	depthStencilStateCreateInfo.stencilTestEnable = VK_FALSE;
-	depthStencilStateCreateInfo.front = {};
-	depthStencilStateCreateInfo.back = {}; // For stencil test
+	VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = MakePipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS);
 
 	// 7. Color blending state
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineColorBlendStateCreateInfo
-	
 	VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
 	colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	// Do minimal work for now, so no blending. This will be useful for later on when we want to do pixel blending (alpha blending).
 	// There are a lot of interesting blending we can do here.
 	colorBlendAttachmentState.blendEnable = VK_FALSE; 
+
+	std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments = {
+		colorBlendAttachmentState
+	};
 	
-	VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = {};
-	colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlendStateCreateInfo.logicOpEnable = VK_FALSE;
-	colorBlendStateCreateInfo.attachmentCount = 1;
-	colorBlendStateCreateInfo.pAttachments = &colorBlendAttachmentState;
+	VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = MakePipelineColorBlendStateCreateInfo(colorBlendAttachments);
 
 	// 8. Dynamic state. Some pipeline states can be updated dynamically. Skip for now.
 
 	// 9. Create pipeline layout to hold uniforms. This can be modified dynamically. 
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = MakePipelineLayoutCreateInfo(&graphics.m_descriptorSetLayout);
-	pipelineLayoutCreateInfo.pSetLayouts = &graphics.m_descriptorSetLayout;
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = MakePipelineLayoutCreateInfo(&graphics.descriptorSetLayout);
+	pipelineLayoutCreateInfo.pSetLayouts = &graphics.descriptorSetLayout;
 	CheckVulkanResult(
-		vkCreatePipelineLayout(m_vulkanDevice->device, &pipelineLayoutCreateInfo, nullptr, &graphics.m_pipelineLayout),
+		vkCreatePipelineLayout(m_vulkanDevice->device, &pipelineLayoutCreateInfo, nullptr, &graphics.pipelineLayout),
 		"Failed to create pipeline layout."
 		);
 
-	// Finally, create our graphics pipeline here!
-	std::array<VkPipelineShaderStageCreateInfo, 2> shaderCreateInfos = { vertShaderStageCreateInfo, fragShaderStageCreateInfo };
-	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
-	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	graphicsPipelineCreateInfo.stageCount = shaderCreateInfos.size(); // Number of shader stages
-	graphicsPipelineCreateInfo.pStages = shaderCreateInfos.data();
-	graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStageCreateInfo;
-	graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
-	graphicsPipelineCreateInfo.pTessellationState = nullptr; // Skipped
-	graphicsPipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
-	graphicsPipelineCreateInfo.pRasterizationState = &rasterizationStateCreateInfo;
-	graphicsPipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
-	graphicsPipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
-	graphicsPipelineCreateInfo.pDepthStencilState = &depthStencilStateCreateInfo;
-	graphicsPipelineCreateInfo.pDynamicState = nullptr; // Skipped
-	graphicsPipelineCreateInfo.layout = graphics.m_pipelineLayout;
-	graphicsPipelineCreateInfo.renderPass = graphics.m_renderPass;
-	graphicsPipelineCreateInfo.subpass = 0; // Index to the subpass we'll be using
+	// -- Setup the programmable stages for the pipeline. This links the shader modules with their corresponding stages.
+	// \ref https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineShaderStageCreateInfo
 
-	// Since pipelins are expensive to create, potentially we could reuse a common parent pipeline.
-	// We just have one here so we don't need to specify these values.
-	graphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
-	graphicsPipelineCreateInfo.basePipelineIndex = -1;
+	std::vector<VkPipelineShaderStageCreateInfo> shaderCreateInfos = { 
+		MakePipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertShader),
+		MakePipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragShader)
+	};
+	
+	// Finally, create our graphics pipeline here!
+
+	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = 
+		MakeGraphicsPipelineCreateInfo(
+			shaderCreateInfos,
+			&vertexInputStageCreateInfo,
+			&inputAssemblyStateCreateInfo,
+			nullptr,
+			&viewportStateCreateInfo,
+			&rasterizationStateCreateInfo,
+			&colorBlendStateCreateInfo,
+			&multisampleStateCreateInfo,
+			&depthStencilStateCreateInfo,
+			nullptr,
+			graphics.pipelineLayout,
+			graphics.m_renderPass,
+			0, // Subpass
+
+			// Since pipelins are expensive to create, potentially we could reuse a common parent pipeline using the base pipeline handle.									
+			// We just have one here so we don't need to specify these values.
+			VK_NULL_HANDLE,
+			-1
+			);
 
 	// We can also cache the pipeline object and store it in a file for resuse
-	result = vkCreateGraphicsPipelines(m_vulkanDevice->device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphics.m_graphicsPipeline);
-	if (result != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create graphics pipeline");
-		return result;
-	}
+	CheckVulkanResult(
+		vkCreateGraphicsPipelines(
+		m_vulkanDevice->device, 
+		VK_NULL_HANDLE,					// Pipeline caches here
+		1,								// Pipeline count
+		&graphicsPipelineCreateInfo, 
+		nullptr, 
+		&graphics.m_graphicsPipeline	// Pipelines
+		),
+		"Failed to create graphics pipeline"
+		);
 
 	// We don't need the shader modules after the graphics pipeline creation. Destroy them now.
 	vkDestroyShaderModule(m_vulkanDevice->device, vertShader, nullptr);
@@ -564,6 +512,8 @@ VulkanRenderer::PrepareDepthResources()
 VkResult 
 VulkanRenderer::PrepareVertexBuffer()
 {
+	graphics.m_geometryBuffers.clear();
+
 	for (GeometryData* geomData : m_scene->m_geometriesData)
 	{
 		VulkanBuffer::GeometryBuffer geomBuffer;
@@ -702,7 +652,7 @@ VulkanRenderer::PrepareDescriptorPool()
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = MakeDescriptorPoolCreateInfo(1, &poolSize, 1);
 
 	CheckVulkanResult(
-		vkCreateDescriptorPool(m_vulkanDevice->device, &descriptorPoolCreateInfo, nullptr, &graphics.m_descriptorPool),
+		vkCreateDescriptorPool(m_vulkanDevice->device, &descriptorPoolCreateInfo, nullptr, &graphics.descriptorPool),
 		"Failed to create descriptor pool"
 	);
 
@@ -710,12 +660,12 @@ VulkanRenderer::PrepareDescriptorPool()
 }
 
 VkResult 
-VulkanRenderer::PrepareGraphicsDescriptorSet() 
+VulkanRenderer::PrepareGraphicsDescriptorSets() 
 {
-	VkDescriptorSetAllocateInfo allocInfo = MakeDescriptorSetAllocateInfo(graphics.m_descriptorPool, &graphics.m_descriptorSetLayout);
+	VkDescriptorSetAllocateInfo allocInfo = MakeDescriptorSetAllocateInfo(graphics.descriptorPool, &graphics.descriptorSetLayout);
 
 	CheckVulkanResult(
-		vkAllocateDescriptorSets(m_vulkanDevice->device, &allocInfo, &graphics.m_descriptorSet),
+		vkAllocateDescriptorSets(m_vulkanDevice->device, &allocInfo, &graphics.descriptorSets),
 		"Failed to allocate descriptor set"
 	);
 
@@ -724,7 +674,7 @@ VulkanRenderer::PrepareGraphicsDescriptorSet()
 	// Update descriptor set info
 	VkWriteDescriptorSet descriptorWrite = MakeWriteDescriptorSet(
 		VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		graphics.m_descriptorSet,
+		graphics.descriptorSets,
 		0,
 		1,
 		&bufferInfo,
@@ -794,7 +744,7 @@ VulkanRenderer::PrepareGraphicsCommandBuffers()
 			vkCmdBindIndexBuffer(graphics.m_commandBuffers[i], geomBuffer.vertexBuffer, geomBuffer.bufferLayout.vertexBufferOffsets.at(INDEX), VK_INDEX_TYPE_UINT16);
 
 			// Bind uniform buffer
-			vkCmdBindDescriptorSets(graphics.m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.m_pipelineLayout, 0, 1, &graphics.m_descriptorSet, 0, nullptr);
+			vkCmdBindDescriptorSets(graphics.m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSets, 0, nullptr);
 
 			// Record draw command for the triangle!
 			vkCmdDrawIndexed(graphics.m_commandBuffers[i], m_scene->m_geometriesData[b]->vertexAttributes.at(INDEX).count, 1, 0, 0, 0);

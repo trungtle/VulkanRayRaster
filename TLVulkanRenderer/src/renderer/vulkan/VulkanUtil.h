@@ -71,6 +71,49 @@ namespace VulkanUtil
 		// ===================
 		// PIPELINE
 		// ===================
+		VkPipelineVertexInputStateCreateInfo
+		MakePipelineVertexInputStateCreateInfo();
+
+		VkPipelineInputAssemblyStateCreateInfo
+		MakePipelineInputAssemblyStateCreateInfo(
+			VkPrimitiveTopology topology
+		);
+
+		VkViewport
+		MakeFullscreenViewport(
+			VkExtent2D extent
+		);
+
+		VkPipelineViewportStateCreateInfo
+		MakePipelineViewportStateCreateInfo(
+			const std::vector<VkViewport>& viewports,
+			const std::vector<VkRect2D>& scissors
+		);
+
+		VkPipelineRasterizationStateCreateInfo
+		MakePipelineRasterizationStateCreateInfo(
+			VkPolygonMode polygonMode,
+			VkCullModeFlags cullMode,
+			VkFrontFace frontFace
+		);
+
+		VkPipelineMultisampleStateCreateInfo
+		MakePipelineMultisampleStateCreateInfo(
+			VkSampleCountFlagBits sampleCount
+		);
+
+		VkPipelineDepthStencilStateCreateInfo
+		MakePipelineDepthStencilStateCreateInfo(
+			VkBool32 depthTestEnable,
+			VkBool32 depthWriteEnable,
+			VkCompareOp compareOp
+		);
+
+		VkPipelineColorBlendStateCreateInfo
+		MakePipelineColorBlendStateCreateInfo(
+			const std::vector<VkPipelineColorBlendAttachmentState>& attachments
+		);
+
 		VkPipelineLayoutCreateInfo
 			MakePipelineLayoutCreateInfo(
 				VkDescriptorSetLayout* descriptorSetLayouts,
@@ -82,6 +125,25 @@ namespace VulkanUtil
 				VkShaderStageFlagBits stage,
 				const VkShaderModule& shaderModule
 			);
+
+		VkGraphicsPipelineCreateInfo
+		MakeGraphicsPipelineCreateInfo(
+			const std::vector<VkPipelineShaderStageCreateInfo>& shaderCreateInfos,
+			const VkPipelineVertexInputStateCreateInfo* vertexInputStage,
+			const VkPipelineInputAssemblyStateCreateInfo* inputAssemblyState,
+			const VkPipelineTessellationStateCreateInfo* tessellationState,
+			const VkPipelineViewportStateCreateInfo* viewportState,
+			const VkPipelineRasterizationStateCreateInfo* rasterizationState,
+			const VkPipelineColorBlendStateCreateInfo* colorBlendState,
+			const VkPipelineMultisampleStateCreateInfo* multisampleState,
+			const VkPipelineDepthStencilStateCreateInfo* depthStencilState,
+			const VkPipelineDynamicStateCreateInfo* dynamicState,
+			const VkPipelineLayout pipelineLayout,
+			const VkRenderPass renderPass,
+			const uint32_t subpass,
+			const VkPipeline basePipelineHandle,
+			const int32_t basePipelineIndex
+		);
 
 		VkComputePipelineCreateInfo
 			MakeComputePipelineCreateInfo(

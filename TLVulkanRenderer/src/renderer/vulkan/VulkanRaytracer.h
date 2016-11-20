@@ -15,30 +15,46 @@ public:
 protected:
 
 	// -----------
+	// BUFFER
+	// -----------
+	VkResult
+	PrepareVertexBuffer() final;
+
+	// -----------
 	// DESCRIPTOR
 	// -----------
 
-	virtual VkResult
-	PrepareDescriptorPool() override;
+	VkResult
+	PrepareDescriptorPool() final;
+
+	VkResult
+	PrepareDescriptorSetLayout() final;
+
+	VkResult
+	PrepareGraphicsDescriptorSets() final;
 
 	VkResult
 	CreateRayTraceTextureResources();
-
-	VkResult
-	PrepareGraphicsPipeline() override;
-
-	VkResult
-	PrepareComputePipeline() override;
 
 	// -----------
 	// PIPELINE
 	// -----------
 
 	VkResult
-	PrepareGraphicsCommandBuffers() override;
+	PrepareGraphicsPipeline() final;
 
 	VkResult
-	PrepareComputeCommandBuffers() override;
+	PrepareComputePipeline() final;
+
+	// -----------
+	// COMMANDS
+	// -----------
+
+	VkResult
+	PrepareGraphicsCommandBuffers() final;
+
+	VkResult
+	PrepareComputeCommandBuffers() final;
 
 
 	struct Compute

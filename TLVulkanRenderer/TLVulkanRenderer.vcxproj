@@ -191,8 +191,8 @@
   <ItemGroup>
     <None Include="shaders\fragShader.frag" />
     <None Include="shaders\raytracing\raytrace.comp" />
-    <None Include="shaders\raytracing\texture.frag" />
-    <None Include="shaders\raytracing\texture.vert" />
+    <None Include="shaders\raytracing\raytrace.frag" />
+    <None Include="shaders\raytracing\raytrace.vert" />
     <None Include="shaders\vertShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

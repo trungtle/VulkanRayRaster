@@ -125,6 +125,139 @@ namespace VulkanUtil
 			return writeDescriptorSet;
 		}
 
+		VkPipelineVertexInputStateCreateInfo 
+		MakePipelineVertexInputStateCreateInfo() 
+		{
+			VkPipelineVertexInputStateCreateInfo vertexInputStageCreateInfo = {};
+			vertexInputStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+			return vertexInputStageCreateInfo;
+		}
+
+		VkPipelineInputAssemblyStateCreateInfo 
+		MakePipelineInputAssemblyStateCreateInfo(
+			VkPrimitiveTopology topology
+			) 
+		{
+			VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
+			inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+			inputAssemblyStateCreateInfo.topology = topology;
+			inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE; // If true, we can break up primitives like triangels and lines using a special index 0xFFFF
+
+			return inputAssemblyStateCreateInfo;
+		}
+
+		VkViewport 
+		MakeFullscreenViewport(
+			VkExtent2D extent
+			) 
+		{
+			VkViewport viewport;
+			viewport.x = 0.0f;
+			viewport.y = 0.0f;
+			viewport.width = static_cast<float>(extent.width);
+			viewport.height = static_cast<float>(extent.height);
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+
+			return viewport;
+		}
+
+		VkPipelineViewportStateCreateInfo 
+		MakePipelineViewportStateCreateInfo(
+			const std::vector<VkViewport>& viewports, 
+			const std::vector<VkRect2D>& scissors
+			) 
+		{
+			VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
+			viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+			viewportStateCreateInfo.viewportCount = viewports.size();
+			viewportStateCreateInfo.pViewports = viewports.data();
+			viewportStateCreateInfo.scissorCount = scissors.size();
+			viewportStateCreateInfo.pScissors = scissors.data();
+
+			return viewportStateCreateInfo;
+		}
+
+		VkPipelineRasterizationStateCreateInfo 
+		MakePipelineRasterizationStateCreateInfo(
+			VkPolygonMode polygonMode, 
+			VkCullModeFlags cullMode, 
+			VkFrontFace frontFace
+			) 
+		{
+			VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
+			rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+			// If enabled, fragments beyond near and far planes are clamped instead of discarded
+			rasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
+			// If enabled, geometry won't pass through rasterization. This would be useful for transform feedbacks
+			// where we don't need to go through the fragment shader
+			rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
+			rasterizationStateCreateInfo.polygonMode = polygonMode; // fill, line, or point
+			rasterizationStateCreateInfo.lineWidth = 1.0f;
+			rasterizationStateCreateInfo.cullMode = cullMode;
+			rasterizationStateCreateInfo.frontFace = frontFace;
+			rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
+			rasterizationStateCreateInfo.depthBiasClamp = 0.0f;
+			rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
+			rasterizationStateCreateInfo.depthBiasSlopeFactor = 0.0f;
+
+			return rasterizationStateCreateInfo;
+		}
+
+		VkPipelineMultisampleStateCreateInfo 
+		MakePipelineMultisampleStateCreateInfo(
+			VkSampleCountFlagBits sampleCount
+			) 
+		{
+			VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = {};
+			multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+			multisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;
+			multisampleStateCreateInfo.rasterizationSamples = sampleCount;
+			multisampleStateCreateInfo.minSampleShading = 1.0f;
+			multisampleStateCreateInfo.pSampleMask = nullptr;
+			multisampleStateCreateInfo.alphaToCoverageEnable = VK_FALSE;
+			multisampleStateCreateInfo.alphaToOneEnable = VK_FALSE;
+
+			return multisampleStateCreateInfo;
+		}
+
+		VkPipelineDepthStencilStateCreateInfo 
+		MakePipelineDepthStencilStateCreateInfo(
+			VkBool32 depthTestEnable, 
+			VkBool32 depthWriteEnable, 
+			VkCompareOp compareOp
+			) 
+		{
+			VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = {};
+			depthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+			depthStencilStateCreateInfo.depthTestEnable = depthTestEnable;
+			depthStencilStateCreateInfo.depthCompareOp = compareOp; // 1.0f is farthest, 0.0f is closest
+			depthStencilStateCreateInfo.depthWriteEnable = depthWriteEnable; // Allowing for transparent objects
+			depthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE; // Allowing to keep fragment falling withn a  certain range
+			depthStencilStateCreateInfo.minDepthBounds = 0.0f;
+			depthStencilStateCreateInfo.maxDepthBounds = 1.0f;
+			depthStencilStateCreateInfo.stencilTestEnable = VK_FALSE;
+			depthStencilStateCreateInfo.front = {};
+			depthStencilStateCreateInfo.back = {}; // For stencil test
+
+			return depthStencilStateCreateInfo;
+		}
+
+		VkPipelineColorBlendStateCreateInfo 
+		MakePipelineColorBlendStateCreateInfo(
+			const std::vector<VkPipelineColorBlendAttachmentState>& attachments
+			) 
+		{
+			VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = {};
+			colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+			colorBlendStateCreateInfo.logicOpEnable = VK_FALSE;
+			colorBlendStateCreateInfo.attachmentCount = attachments.size();
+			colorBlendStateCreateInfo.pAttachments = attachments.data();
+
+			return colorBlendStateCreateInfo;
+		}
+
 		VkPipelineLayoutCreateInfo
 			MakePipelineLayoutCreateInfo(
 				VkDescriptorSetLayout* descriptorSetLayouts,
@@ -165,6 +298,48 @@ namespace VulkanUtil
 			shaderStageCreateInfo.pSpecializationInfo = nullptr;
 
 			return shaderStageCreateInfo;
+		}
+
+		VkGraphicsPipelineCreateInfo 
+		MakeGraphicsPipelineCreateInfo(
+			const std::vector<VkPipelineShaderStageCreateInfo>& shaderCreateInfos, 
+			const VkPipelineVertexInputStateCreateInfo* vertexInputStage, 
+			const VkPipelineInputAssemblyStateCreateInfo* inputAssemblyState, 
+			const VkPipelineTessellationStateCreateInfo* tessellationState, 
+			const VkPipelineViewportStateCreateInfo* viewportState, 
+			const VkPipelineRasterizationStateCreateInfo* rasterizationState, 
+			const VkPipelineColorBlendStateCreateInfo* colorBlendState, 
+			const VkPipelineMultisampleStateCreateInfo* multisampleState, 
+			const VkPipelineDepthStencilStateCreateInfo* depthStencilState, 
+			const VkPipelineDynamicStateCreateInfo* dynamicState, 
+			const VkPipelineLayout pipelineLayout, 
+			const VkRenderPass renderPass, 
+			const uint32_t subpass,
+			const VkPipeline basePipelineHandle,
+			const int32_t basePipelineIndex
+			) 
+		{
+			VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
+			graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+			graphicsPipelineCreateInfo.stageCount = shaderCreateInfos.size(); // Number of shader stages
+			graphicsPipelineCreateInfo.pStages = shaderCreateInfos.data();
+			graphicsPipelineCreateInfo.pVertexInputState = vertexInputStage;
+			graphicsPipelineCreateInfo.pInputAssemblyState = inputAssemblyState;
+			graphicsPipelineCreateInfo.pTessellationState = tessellationState;
+			graphicsPipelineCreateInfo.pViewportState = viewportState;
+			graphicsPipelineCreateInfo.pRasterizationState = rasterizationState;
+			graphicsPipelineCreateInfo.pColorBlendState = colorBlendState;
+			graphicsPipelineCreateInfo.pMultisampleState = multisampleState;
+			graphicsPipelineCreateInfo.pDepthStencilState = depthStencilState;
+			graphicsPipelineCreateInfo.pDynamicState = dynamicState;
+			graphicsPipelineCreateInfo.layout = pipelineLayout;
+			graphicsPipelineCreateInfo.renderPass = renderPass;
+			graphicsPipelineCreateInfo.subpass = 0; // Index to the subpass we'll be using
+			
+			graphicsPipelineCreateInfo.basePipelineHandle = basePipelineHandle;
+			graphicsPipelineCreateInfo.basePipelineIndex = basePipelineIndex;
+
+			return graphicsPipelineCreateInfo;
 		}
 
 		void

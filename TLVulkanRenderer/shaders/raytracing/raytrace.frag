@@ -5,8 +5,9 @@
 layout(binding = 0) uniform sampler2D s_sampler;
 
 layout(location = 0) in vec2 f_uv;
+
 layout(location = 0) out vec4 o_color;
 
 void main() {
-	o_color = texture2D(s_sampler, f_uv);
+	o_color = texture(s_sampler, vec2(f_uv.s, 1.0 - f_uv.t));
 }

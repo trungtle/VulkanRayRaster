@@ -98,24 +98,13 @@ public:
 	// Member functions
 	// ================================================
 
-	void Initialize(GLFWwindow* window);
+	void 
+	Initialize(
+		GLFWwindow* window
+		);
 
-	void Destroy();
-
-	// ================================================
-	// Class functions
-	// ================================================
-
-	/**
-	* \brief Check if this GPU is Vulkan compatible
-	* \param VkPhysicalDevice to inspect
-	* \return true if the GPU supports Vulkan
-	*/
-	static bool
-	IsDeviceVulkanCompatible(
-		const VkPhysicalDevice& physicalDeivce
-		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
-	);
+	void 
+	Destroy();
 
 	uint32_t
 	GetMemoryType(
@@ -188,6 +177,21 @@ public:
 		VkImage srcImage,
 		uint32_t width,
 		uint32_t height
+	);
+
+	// ================================================
+	// Class functions
+	// ================================================
+
+	/**
+	* \brief Check if this GPU is Vulkan compatible
+	* \param VkPhysicalDevice to inspect
+	* \return true if the GPU supports Vulkan
+	*/
+	static bool
+	IsDeviceVulkanCompatible(
+		const VkPhysicalDevice& physicalDeivce
+		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
 	);
 
 private:

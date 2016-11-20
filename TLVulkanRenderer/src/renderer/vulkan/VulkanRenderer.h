@@ -84,10 +84,10 @@ protected:
 	VkResult
 	PrepareDepthResources();
 
-	VkResult
+	virtual VkResult
 	PrepareVertexBuffer();
 
-	VkResult
+	virtual VkResult
 	PrepareUniformBuffer();
 
 	// -----------
@@ -97,11 +97,11 @@ protected:
 	virtual VkResult
 	PrepareDescriptorPool();
 
-	VkResult
-	PrepareGraphicsDescriptorSet();
-
-	VkResult
+	virtual VkResult
 	PrepareDescriptorSetLayout();
+
+	virtual VkResult
+	PrepareGraphicsDescriptorSets();
 
 	// --------------
 	// COMMAND BUFFERS
@@ -150,22 +150,22 @@ protected:
 		/**
 		* \brief Descriptor set layout to decribe our resource binding (ex. UBO)
 		*/
-		VkDescriptorSetLayout m_descriptorSetLayout;
+		VkDescriptorSetLayout descriptorSetLayout;
 
 		/**
 		* \brief Descriptor pool for our resources
 		*/
-		VkDescriptorPool m_descriptorPool;
+		VkDescriptorPool descriptorPool;
 
 		/**
 		* \brief Descriptor set for our resources
 		*/
-		VkDescriptorSet m_descriptorSet;
+		VkDescriptorSet descriptorSets;
 
 		/**
 		* \brief This describes the uniforms inside shaders
 		*/
-		VkPipelineLayout m_pipelineLayout;
+		VkPipelineLayout pipelineLayout;
 
 		/**
 		* \brief Holds the renderpass object. This also represents the framebuffer attachments
