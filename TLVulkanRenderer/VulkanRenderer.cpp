@@ -608,44 +608,35 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 	// Load SPIR-V bytecode
 	// The SPIR_V files can be compiled by running glsllangValidator.exe from the VulkanSDK or
 	// by invoking the custom script shaders/compileShaders.bat
-	std::vector<char> vertShaderBytecode;
-	std::vector<char> fragShaderBytecode;
-	LoadSPIR_V("shaders/vert.spv", "shaders/frag.spv", vertShaderBytecode, fragShaderBytecode);
-	m_logger->info("Loaded {} vertex shader, file size {} bytes", "shaders/vert.spv", vertShaderBytecode.size());
-	m_logger->info("Loaded {} frag shader, file size {} bytes", "shaders/frag.spv", fragShaderBytecode.size());
 	
-	// Create shader modules from bytecodes
+	// -- Load vertex shader
 	VkShaderModule vertShader;
 	PrepareShaderModule(
-		vertShaderBytecode,
+		"shaders/vert.spv",
 		vertShader
-		);
+	);
+	m_logger->info("Loaded {} vertex shader", "shaders/vert.spv");
 
+	// -- Load fragment shader
 	VkShaderModule fragShader;
 	PrepareShaderModule(
-		fragShaderBytecode,
+		"shaders/frag.spv",
 		fragShader
 	);
+	m_logger->info("Loaded {} frag shader", "shaders/frag.spv");
+
 
 	// -- Setup the programmable stages for the pipeline. This links the shader modules with their corresponding stages.
 	// \ref https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineShaderStageCreateInfo
-	VkPipelineShaderStageCreateInfo vertShaderStageCreateInfo = {};
-	vertShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageCreateInfo.module = vertShader;
-	vertShaderStageCreateInfo.pName = "main"; // Specify entry point. It's possible to combine multiple shaders into a single shader module
+	VkPipelineShaderStageCreateInfo vertShaderStageCreateInfo = MakePipelineShaderStageCreateInfo(
+		VK_SHADER_STAGE_VERTEX_BIT,
+		vertShader
+		);
 	
-	// This can be used to set values for shader constants. The compiler can perform optimization for these constants vs. if they're created as variables in the shaders.
-	vertShaderStageCreateInfo.pSpecializationInfo = nullptr; 
-	
-	VkPipelineShaderStageCreateInfo fragShaderStageCreateInfo = {};
-	fragShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageCreateInfo.module = fragShader;
-	fragShaderStageCreateInfo.pName = "main"; // Specify entry point. It's possible to combine multiple shaders into a single shader module
-
-	// This can be used to set values for shader constants. The compiler can perform optimization for these constants vs. if they're created as variables in the shaders.
-	fragShaderStageCreateInfo.pSpecializationInfo = nullptr;
+	VkPipelineShaderStageCreateInfo fragShaderStageCreateInfo = MakePipelineShaderStageCreateInfo(
+		VK_SHADER_STAGE_FRAGMENT_BIT,
+		fragShader
+		);
 
 	// -- Setup the fixed functions stages for the pipeline.
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineVertexInputStateCreateInfo
@@ -775,11 +766,11 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 		);
 
 	// Finally, create our graphics pipeline here!
-	VkPipelineShaderStageCreateInfo createInfos[2] = { vertShaderStageCreateInfo, fragShaderStageCreateInfo };
+	std::array<VkPipelineShaderStageCreateInfo, 2> shaderCreateInfos = { vertShaderStageCreateInfo, fragShaderStageCreateInfo };
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	graphicsPipelineCreateInfo.stageCount = 2; // Number of shader stages
-	graphicsPipelineCreateInfo.pStages = createInfos;
+	graphicsPipelineCreateInfo.stageCount = shaderCreateInfos.size(); // Number of shader stages
+	graphicsPipelineCreateInfo.pStages = shaderCreateInfos.data();
 	graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStageCreateInfo;
 	graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
 	graphicsPipelineCreateInfo.pTessellationState = nullptr; // Skipped
@@ -1181,16 +1172,19 @@ VulkanRenderer::PrepareSemaphores()
 
 VkResult
 VulkanRenderer::PrepareShaderModule(
-	const std::vector<char>& code
-	, VkShaderModule& shaderModule
-)
+	const std::string& filepath, 
+	VkShaderModule& shaderModule
+	) const 
 {
+	std::vector<Byte> bytecode;
+	LoadSPIR_V(filepath.c_str(), bytecode);
+
 	VkResult result = VK_SUCCESS;
 
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	shaderModuleCreateInfo.codeSize = code.size();
-	shaderModuleCreateInfo.pCode = (uint32_t*)code.data();
+	shaderModuleCreateInfo.codeSize = bytecode.size();
+	shaderModuleCreateInfo.pCode = (uint32_t*)bytecode.data();
 
 	result = vkCreateShaderModule(m_device, &shaderModuleCreateInfo, nullptr, &shaderModule);
 	if (result != VK_SUCCESS) 

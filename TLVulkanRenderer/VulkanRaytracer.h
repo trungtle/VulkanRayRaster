@@ -55,10 +55,10 @@ protected:
 
 		struct {
 			// -- Uniform buffer
-			VkBuffer uniform;
+			StorageBuffer uniformBuffer;
 
 			// -- Triangle buffers
-			VkBuffer vertexBuffer;
+			StorageBuffer trianglesBuffer;
 		} buffer;
 
 		// -- Output storage image

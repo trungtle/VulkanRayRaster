@@ -165,6 +165,7 @@
     <ClInclude Include="thirdparty\tinygltfloader\picojson.h" />
     <ClInclude Include="thirdparty\tinygltfloader\stb_image.h" />
     <ClInclude Include="thirdparty\tinygltfloader\tiny_gltf_loader.h" />
+    <ClInclude Include="Typedef.h" />
     <ClInclude Include="Utilities.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Scene.h" />

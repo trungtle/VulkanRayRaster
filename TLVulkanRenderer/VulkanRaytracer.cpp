@@ -1,4 +1,5 @@
 #include "VulkanRaytracer.h"
+#include "Utilities.h"
 
 VulkanRaytracer::VulkanRaytracer(
 	GLFWwindow* window, 
@@ -122,6 +123,7 @@ VulkanRaytracer::PrepareComputePipeline()
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			VK_SHADER_STAGE_COMPUTE_BIT
 		),
+		// Binding 2: uniform buffer for triangles
 		MakeDescriptorSetLayoutBinding(
 			2,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -171,23 +173,44 @@ VulkanRaytracer::PrepareComputePipeline()
 			nullptr,
 			&compute.m_rayTracedTexture.descriptor
 			),
-		//MakeWriteDescriptorSet(
-		//	VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		//	compute.descriptorSets,
-		//	1, // Binding 1
-		//	compute.buffer.uniform.descriptor,
-		//	nullptr
-		//	),
-		//MakeWriteDescriptorSet(
-		//	VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-		//	2, // Binding 2
-		//	compute.vertexBuffer.descriptor,
-		//	nullptr
-		//	)
+		MakeWriteDescriptorSet(
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			compute.descriptorSets,
+			1, // Binding 1
+			1,
+			&compute.buffer.uniformBuffer.descriptor,
+			nullptr
+			),
+		MakeWriteDescriptorSet(
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			compute.descriptorSets,
+			2, // Binding 2
+			1,
+			&compute.buffer.trianglesBuffer.descriptor,
+			nullptr
+			)
 	};
 
+	vkUpdateDescriptorSets(m_device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, NULL);
 
 	// 6. Create compute shader pipeline
+	VkComputePipelineCreateInfo computePipelineCreateInfo = MakeComputePipelineCreateInfo(compute.pipelineLayout, 0);
+
+	// Create shader modules from bytecodes
+	VkShaderModule raytraceShader;
+	PrepareShaderModule(
+		"shaders/raytracing/raytrace.spv",
+		raytraceShader
+	);
+	m_logger->info("Loaded {} vertex shader", "shaders/raytracing/raytrace/raytrace.spv");
+
+
+	computePipelineCreateInfo.stage = MakePipelineShaderStageCreateInfo(VK_SHADER_STAGE_COMPUTE_BIT, raytraceShader);
+
+	CheckVulkanResult(
+		vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline),
+		"Failed to create compute pipeline"
+	);
 
 	// 7. Create compute command pool
 

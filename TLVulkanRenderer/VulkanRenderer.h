@@ -10,6 +10,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <vulkan/vulkan.h>
 #include "thirdparty/spdlog/spdlog.h"
+#include "Typedef.h"
 #include "Renderer.h"
 #include "VulkanUtil.h"
 
@@ -79,9 +80,9 @@ protected:
 
 	VkResult
 	PrepareShaderModule(
-		const std::vector<char>& code
-		, VkShaderModule& shaderModule
-		);
+		const std::string& filepath,
+		VkShaderModule& shaderModule
+		) const;
 
 	VkResult
 	PrepareFramebuffers();

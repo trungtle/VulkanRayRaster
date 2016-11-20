@@ -488,6 +488,35 @@ namespace VulkanUtil
 		return pipelineLayoutCreateInfo;
 	}
 
+	VkComputePipelineCreateInfo 
+	MakeComputePipelineCreateInfo(VkPipelineLayout layout, VkPipelineCreateFlags flags) {
+		VkComputePipelineCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		createInfo.layout = layout;
+		createInfo.flags = flags;
+
+		return createInfo;
+	}
+
+	VkPipelineShaderStageCreateInfo 
+	MakePipelineShaderStageCreateInfo(
+		VkShaderStageFlagBits stage, 
+		const VkShaderModule& shaderModule
+		) 
+	{
+		VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {};
+		shaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shaderStageCreateInfo.stage = stage;
+		shaderStageCreateInfo.module = shaderModule;
+		// Specify entry point. It's possible to combine multiple shaders into a single shader module
+		shaderStageCreateInfo.pName = "main";
+
+		// This can be used to set values for shader constants. The compiler can perform optimization for these constants vs. if they're created as variables in the shaders.
+		shaderStageCreateInfo.pSpecializationInfo = nullptr;
+
+		return shaderStageCreateInfo;
+	}
+
 	void
 	MakeDefaultTextureSampler(
 		const VkDevice& device,

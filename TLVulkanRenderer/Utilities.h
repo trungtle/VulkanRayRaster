@@ -1,11 +1,13 @@
 #pragma once
 
+#include "Typedef.h"
+
 /**
  * \brief Read a binary file and returns its bytes
  * \param fileName 
  * \return bytes from the binary file
  */
-std::vector<char>
+std::vector<Byte>
 ReadBinaryFile(
 	const std::string& fileName
 	);
@@ -18,8 +20,6 @@ ReadBinaryFile(
  */
 void 
 LoadSPIR_V(
-	const char* vertShaderFilePath
-	, const char* fragShaderFilePath
-	, std::vector<char>& outVertShader
-	, std::vector<char>& outFragShader
+	const char* filepath, 
+	std::vector<Byte>& outShader
 );

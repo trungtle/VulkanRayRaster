@@ -175,6 +175,18 @@ namespace VulkanUtil
 		uint32_t setLayoutCount = 1
 	);
 
+	VkPipelineShaderStageCreateInfo
+	MakePipelineShaderStageCreateInfo(
+		VkShaderStageFlagBits stage,
+		const VkShaderModule& shaderModule
+	);
+
+	VkComputePipelineCreateInfo
+		MakeComputePipelineCreateInfo(
+			VkPipelineLayout layout,
+			VkPipelineCreateFlags flags
+		);
+
 	// ===================
 	// TEXTURE
 	// ===================

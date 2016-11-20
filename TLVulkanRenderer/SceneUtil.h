@@ -1,6 +1,5 @@
 #pragma once
-
-typedef unsigned char Byte;
+#include "Typedef.h"
 
 // ---------
 // VERTEX
