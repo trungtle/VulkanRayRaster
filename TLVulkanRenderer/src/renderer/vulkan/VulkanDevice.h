@@ -93,9 +93,18 @@ public:
 	*/
 	QueueFamilyIndices queueFamilyIndices;
 
+
+	// ================================================
+	// Member functions
+	// ================================================
+
 	void Initialize(GLFWwindow* window);
 
 	void Destroy();
+
+	// ================================================
+	// Class functions
+	// ================================================
 
 	/**
 	* \brief Check if this GPU is Vulkan compatible
@@ -108,6 +117,79 @@ public:
 		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
 	);
 
+	uint32_t
+	GetMemoryType(
+		uint32_t typeFilter
+		, VkMemoryPropertyFlags propertyFlags
+	) const;
+
+	void
+	CreateBuffer(
+		const VkDeviceSize size,
+		const VkBufferUsageFlags usage,
+		VkBuffer& buffer
+	) const;
+
+	void
+	CreateMemory(
+		const VkMemoryPropertyFlags memoryProperties,
+		const VkBuffer& buffer,
+		VkDeviceMemory& memory
+	) const;
+
+	void
+	CopyBuffer(
+		VkQueue queue,
+		VkCommandPool commandPool,
+		VkBuffer dstBuffer,
+		VkBuffer srcBuffer,
+		VkDeviceSize size
+	) const;
+
+	void
+	CreateImage(
+		uint32_t width,
+		uint32_t height,
+		uint32_t depth,
+		VkImageType imageType,
+		VkFormat format,
+		VkImageTiling tiling,
+		VkImageUsageFlags usage,
+		VkMemoryPropertyFlags properties,
+		VkImage& image,
+		VkDeviceMemory& imageMemory
+	);
+
+	void
+	CreateImageView(
+		const VkImage& image,
+		VkImageViewType viewType,
+		VkFormat format,
+		VkImageAspectFlags aspectFlags,
+		VkImageView& imageView
+	);
+
+	void
+	TransitionImageLayout(
+		VkQueue queue,
+		VkCommandPool commandPool,
+		VkImage image,
+		VkFormat format,
+		VkImageAspectFlags aspectMask,
+		VkImageLayout oldLayout,
+		VkImageLayout newLayout
+	);
+
+	void
+	CopyImage(
+		VkQueue queue,
+		VkCommandPool commandPool,
+		VkImage dstImage,
+		VkImage srcImage,
+		uint32_t width,
+		uint32_t height
+	);
+
 private:
 	/**
 	* \brief Name of the Vulkan application. This is the name of our whole application in general.
@@ -116,25 +198,35 @@ private:
 
 	std::shared_ptr<spdlog::logger> m_logger;
 
+	VkResult
+	InitializeVulkanInstance();
 
 	VkResult
-		InitializeVulkanInstance();
+	SetupDebugCallback();
 
 	VkResult
-		SetupDebugCallback();
-
-
-	VkResult
-		CreateWindowSurface(GLFWwindow* window);
+	CreateWindowSurface(GLFWwindow* window);
 
 	VkResult
-		SelectPhysicalDevice();
+	SelectPhysicalDevice();
 
 	VkResult
-		SetupLogicalDevice();
+	SetupLogicalDevice();
 
 	VkResult
-		PrepareSwapchain();
+	PrepareSwapchain();
+
+	VkCommandBuffer
+	BeginSingleTimeCommands(
+		VkCommandPool commandPool
+	) const;
+
+	void
+	EndSingleTimeCommands(
+		VkQueue queue,
+		VkCommandPool commandPool,
+		VkCommandBuffer commandBuffer
+	) const;
 
 };
 

@@ -126,7 +126,4 @@ namespace VulkanUtil
 			throw std::runtime_error(message);
 		}
 	}
-
-
-
 }

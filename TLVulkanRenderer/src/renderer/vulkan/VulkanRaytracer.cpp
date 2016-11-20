@@ -39,7 +39,7 @@ VulkanRaytracer::CreateRayTraceTextureResources()
 {
 	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
 
-	CreateImage(
+	m_vulkanDevice->CreateImage(
 		m_vulkanDevice->m_swapchain.extent.width,
 		m_vulkanDevice->m_swapchain.extent.height,
 		1, // only a 2D depth image
@@ -52,7 +52,7 @@ VulkanRaytracer::CreateRayTraceTextureResources()
 		compute.storageRaytraceImage.image,
 		compute.storageRaytraceImage.imageMemory
 	);
-	CreateImageView(
+	m_vulkanDevice->CreateImageView(
 		compute.storageRaytraceImage.image,
 		VK_IMAGE_VIEW_TYPE_2D,
 		imageFormat,
@@ -60,7 +60,9 @@ VulkanRaytracer::CreateRayTraceTextureResources()
 		compute.storageRaytraceImage.imageView
 	);
 
-	TransitionImageLayout(
+	m_vulkanDevice->TransitionImageLayout(
+		graphics.m_graphicsQueue,
+		graphics.m_graphicsCommandPool,
 		compute.storageRaytraceImage.image,
 		imageFormat,
 		VK_IMAGE_ASPECT_COLOR_BIT,
