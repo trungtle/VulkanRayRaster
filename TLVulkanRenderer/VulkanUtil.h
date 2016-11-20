@@ -11,25 +11,244 @@ using namespace glm;
 
 namespace VulkanUtil
 {
+	// -------- Type ----------- //
+
+	namespace Type {
+
+		struct Texture
+		{
+			int width;
+			int height;
+			VkImage image;
+			VkImageView imageView;
+			VkDeviceMemory imageMemory;
+			VkSampler sampler;
+			VkDescriptorImageInfo descriptor;
+		};
+
+		struct VertexAttributeDescriptions
+		{
+
+			VkVertexInputAttributeDescription position;
+			VkVertexInputAttributeDescription normal;
+			VkVertexInputAttributeDescription texcoord;
+
+			std::array<VkVertexInputAttributeDescription, 2>
+				ToArray() const
+			{
+				std::array<VkVertexInputAttributeDescription, 2> attribDesc = {
+					position,
+					normal
+				};
+
+				return attribDesc;
+			}
+		};
+
+		// ===================
+		// UNIFORM
+		// ===================
+
+		struct UniformBufferObject
+		{
+			glm::mat4 model;
+			glm::mat4 view;
+			glm::mat4 proj;
+		};
+
+		// ===================
+		// BUFFER
+		// ===================
+
+		struct GeometryBufferOffset
+		{
+			std::map<EVertexAttributeType, VkDeviceSize> vertexBufferOffsets;
+		};
+
+		struct StorageBuffer
+		{
+			VkBuffer buffer;
+			VkDescriptorBufferInfo descriptor;
+		};
+		// ===================
+		// QUEUE
+		// ===================
+
+		/**
+		* \brief A struct to store queue family indices
+		*/
+		struct QueueFamilyIndices
+		{
+			int graphicsFamily = -1;
+			int presentFamily = -1;
+			int computeFamily = -1;
+			int transferFamily = -1;
+
+			bool IsComplete() const {
+				return graphicsFamily >= 0 && presentFamily >= 0 && computeFamily >= 0 && transferFamily >= 0;
+			}
+		};
+
+		// ===================
+		// SWAPCHAIN SUPPORT
+		// ===================
+
+		/**
+		* \brief Struct to store available swapchain support
+		*/
+		struct SwapchainSupport
+		{
+			VkSurfaceCapabilitiesKHR capabilities;
+			std::vector<VkSurfaceFormatKHR> surfaceFormats;
+			std::vector<VkPresentModeKHR> presentModes;
+
+			bool IsComplete() const {
+				return !surfaceFormats.empty() && !presentModes.empty();
+			}
+		};
+
+		// ===================
+		// GEOMETRIES
+		// ===================
+		struct GeometryBuffer
+		{
+			/**
+			* \brief Byte offsets for vertex attributes and resource buffers into our unified buffer
+			*/
+			GeometryBufferOffset bufferLayout;
+
+			/**
+			* \brief Handle to the vertex buffers
+			*/
+			VkBuffer vertexBuffer;
+
+			/**
+			* \brief Handle to the device memory
+			*/
+			VkDeviceMemory vertexBufferMemory;
+		};
+	}
+
+	namespace Make
+	{
+		// ===================
+		// DESCRIPTOR
+		// ===================
+
+		VkDescriptorPoolSize
+			MakeDescriptorPoolSize(
+				VkDescriptorType descriptorType,
+				uint32_t descriptorCount
+			);
+
+		VkDescriptorPoolCreateInfo
+			MakeDescriptorPoolCreateInfo(
+				uint32_t poolSizeCount,
+				VkDescriptorPoolSize* poolSizes,
+				uint32_t maxSets = 1
+			);
+
+		VkDescriptorSetLayoutBinding
+			MakeDescriptorSetLayoutBinding(
+				uint32_t binding,
+				VkDescriptorType descriptorType,
+				VkShaderStageFlags shaderFlags,
+				uint32_t descriptorCount = 1
+			);
+
+		VkDescriptorSetLayoutCreateInfo
+			MakeDescriptorSetLayoutCreateInfo(
+				VkDescriptorSetLayoutBinding* bindings,
+				uint32_t bindingCount = 1
+			);
+
+		VkDescriptorSetAllocateInfo
+			MakeDescriptorSetAllocateInfo(
+				VkDescriptorPool descriptorPool,
+				VkDescriptorSetLayout* descriptorSetLayout,
+				uint32_t descriptorSetCount = 1
+			);
+
+		VkDescriptorBufferInfo
+			MakeDescriptorBufferInfo(
+				VkBuffer buffer,
+				VkDeviceSize offset,
+				VkDeviceSize range
+			);
+
+		VkWriteDescriptorSet
+			MakeWriteDescriptorSet(
+				VkDescriptorType type,
+				VkDescriptorSet dstSet,
+				uint32_t dstBinding,
+				uint32_t descriptorCount,
+				VkDescriptorBufferInfo* bufferInfo,
+				VkDescriptorImageInfo* imageInfo
+			);
+
+		// ===================
+		// PIPELINE
+		// ===================
+		VkPipelineLayoutCreateInfo
+			MakePipelineLayoutCreateInfo(
+				VkDescriptorSetLayout* descriptorSetLayouts,
+				uint32_t setLayoutCount = 1
+			);
+
+		VkPipelineShaderStageCreateInfo
+			MakePipelineShaderStageCreateInfo(
+				VkShaderStageFlagBits stage,
+				const VkShaderModule& shaderModule
+			);
+
+		VkComputePipelineCreateInfo
+			MakeComputePipelineCreateInfo(
+				VkPipelineLayout layout,
+				VkPipelineCreateFlags flags
+			);
+
+		// ===================
+		// TEXTURE
+		// ===================
+
+		void
+			MakeDefaultTextureSampler(
+				const VkDevice& device,
+				VkSampler* sampler
+			);
+		// ===================
+		// COMMANDS
+		// ===================
+		VkCommandPoolCreateInfo
+			MakeCommandPoolCreateInfo(
+				uint32_t queueFamilyIndex
+			);
+
+		VkCommandBufferAllocateInfo
+			MakeCommandBufferAllocateInfo(
+				VkCommandPool commandPool,
+				VkCommandBufferLevel level,
+				uint32_t bufferCount
+			);
+	}
+
 	inline void CheckVulkanResult(
 		VkResult result,
 		std::string message
-		) 
+	)
 	{
-		if(result != VK_SUCCESS) {
+		if (result != VK_SUCCESS)
+		{
 			throw std::runtime_error(message);
 		}
 	}
 
-	// ===================
-	// VERTEX
-	// ===================
 
 	static
-	VkVertexInputBindingDescription
-	GetVertexInputBindingDescription(
-		uint32_t binding,
-		const VertexAttributeInfo& vertexAttrib
+		VkVertexInputBindingDescription
+		GetVertexInputBindingDescription(
+			uint32_t binding,
+			const VertexAttributeInfo& vertexAttrib
 		)
 	{
 		VkVertexInputBindingDescription bindingDesc;
@@ -39,31 +258,11 @@ namespace VulkanUtil
 		return bindingDesc;
 	}
 
-	typedef struct VertexAttributeDescriptionsTyp
-	{
-
-		VkVertexInputAttributeDescription position;
-		VkVertexInputAttributeDescription normal;
-		VkVertexInputAttributeDescription texcoord;
-
-		std::array<VkVertexInputAttributeDescription, 2>
-			ToArray() const
-		{
-			std::array<VkVertexInputAttributeDescription, 2> attribDesc = {
-				position,
-				normal
-			};
-
-			return attribDesc;
-		}
-
-	} VertexAttributeDescriptions;
-
 	static
-	std::array<VkVertexInputAttributeDescription, 2>
-	GetAttributeDescriptions()
+		std::array<VkVertexInputAttributeDescription, 2>
+		GetAttributeDescriptions()
 	{
-		VertexAttributeDescriptions attributeDesc;
+		Type::VertexAttributeDescriptions attributeDesc;
 
 		// Position attribute
 		attributeDesc.position.binding = 0;
@@ -86,208 +285,32 @@ namespace VulkanUtil
 		return attributeDesc.ToArray();
 	}
 
-	// ===================
-	// UNIFORM
-	// ===================
-
-	struct UniformBufferObject
-	{
-		glm::mat4 model;
-		glm::mat4 view;
-		glm::mat4 proj;
-	};
-
-	// ===================
-	// BUFFER
-	// ===================
-
-	struct GeometryBufferOffset
-	{
-		std::map<EVertexAttributeType, VkDeviceSize> vertexBufferOffsets;
-	};
-
-	struct StorageBuffer {
-		VkBuffer buffer;
-		VkDescriptorBufferInfo descriptor;
-	};
-
-	// ===================
-	// DESCRIPTOR
-	// ===================
-	
-	VkDescriptorPoolSize
-	MakeDescriptorPoolSize(
-		VkDescriptorType descriptorType,
-		uint32_t descriptorCount
-	);
-
-	VkDescriptorPoolCreateInfo
-	MakeDescriptorPoolCreateInfo(
-		uint32_t poolSizeCount,
-		VkDescriptorPoolSize* poolSizes,
-		uint32_t maxSets = 1
-	);
-
-	VkDescriptorSetLayoutBinding
-	MakeDescriptorSetLayoutBinding(
-		uint32_t binding,
-		VkDescriptorType descriptorType,
-		VkShaderStageFlags shaderFlags,
-		uint32_t descriptorCount = 1
-		);
-
-	VkDescriptorSetLayoutCreateInfo
-	MakeDescriptorSetLayoutCreateInfo(
-		VkDescriptorSetLayoutBinding* bindings,
-		uint32_t bindingCount = 1
-	);
-
-	VkDescriptorSetAllocateInfo
-	MakeDescriptorSetAllocateInfo(
-		VkDescriptorPool descriptorPool,
-		VkDescriptorSetLayout* descriptorSetLayout,
-		uint32_t descriptorSetCount = 1
-	);
-
-	VkDescriptorBufferInfo
-	MakeDescriptorBufferInfo(
-		VkBuffer buffer,
-		VkDeviceSize offset,
-		VkDeviceSize range
-	);
-
-	VkWriteDescriptorSet
-	MakeWriteDescriptorSet(
-		VkDescriptorType type,
-		VkDescriptorSet dstSet,
-		uint32_t dstBinding,
-		uint32_t descriptorCount,
-		VkDescriptorBufferInfo* bufferInfo,
-		VkDescriptorImageInfo* imageInfo
-	);
-
-	// ===================
-	// PIPELINE
-	// ===================
-	VkPipelineLayoutCreateInfo
-	MakePipelineLayoutCreateInfo(
-		VkDescriptorSetLayout* descriptorSetLayouts,
-		uint32_t setLayoutCount = 1
-	);
-
-	VkPipelineShaderStageCreateInfo
-	MakePipelineShaderStageCreateInfo(
-		VkShaderStageFlagBits stage,
-		const VkShaderModule& shaderModule
-	);
-
-	VkComputePipelineCreateInfo
-		MakeComputePipelineCreateInfo(
-			VkPipelineLayout layout,
-			VkPipelineCreateFlags flags
-		);
-
-	// ===================
-	// TEXTURE
-	// ===================
-	typedef struct TextureTyp
-	{
-		int width;
-		int height;
-		VkImage image;
-		VkImageView imageView;
-		VkDeviceMemory imageMemory;
-		VkSampler sampler;
-		VkDescriptorImageInfo descriptor;
-	} Texture;
-
-	void 
-	MakeDefaultTextureSampler(
-		const VkDevice& device,
-		VkSampler* sampler
-	);
-
-	// ===================
-	// QUEUE
-	// ===================
-
-	/**
-	* \brief A struct to store queue family indices
-	*/
-	typedef struct QueueFamilyIndicesTyp
-	{
-		int graphicsFamily = -1;
-		int presentFamily = -1;
-		int computeFamily = -1;
-		int transferFamily = -1;
-
-		bool IsComplete() const {
-			return graphicsFamily >= 0 && presentFamily >= 0 && computeFamily >= 0 && transferFamily >= 0;
-		}
-	} QueueFamilyIndices;
-
-	QueueFamilyIndices
+	Type::QueueFamilyIndices
 		FindQueueFamilyIndices(
 			const VkPhysicalDevice& physicalDevicece
 			, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
 		);
 
-	// ===================
-	// SWAPCHAIN SUPPORT
-	// ===================
 
-	/**
-	* \brief Struct to store available swapchain support
-	*/
-	typedef struct SwapchainSupportTyp
-	{
-		VkSurfaceCapabilitiesKHR capabilities;
-		std::vector<VkSurfaceFormatKHR> surfaceFormats;
-		std::vector<VkPresentModeKHR> presentModes;
-
-		bool IsComplete() const {
-			return !surfaceFormats.empty() && !presentModes.empty();
-		}
-	} SwapchainSupport;
-
-	// ===================
-	// GEOMETRIES
-	// ===================
-	typedef struct GeometryBufferTyp {
-		/**
-		* \brief Byte offsets for vertex attributes and resource buffers into our unified buffer
-		*/
-		GeometryBufferOffset bufferLayout;
-
-		/**
-		* \brief Handle to the vertex buffers
-		*/
-		VkBuffer vertexBuffer;
-
-		/**
-		* \brief Handle to the device memory
-		*/
-		VkDeviceMemory vertexBufferMemory;
-	} GeometryBuffer;
 
 	// ===================
 	// EXTENSIONS
 	// ===================
 
 	bool
-	CheckValidationLayerSupport(
-		const std::vector<const char*>& validationLayers
-	);
+		CheckValidationLayerSupport(
+			const std::vector<const char*>& validationLayers
+		);
 
 	std::vector<const char*>
-	GetInstanceRequiredExtensions(
-		bool enableValidationLayers
-	);
+		GetInstanceRequiredExtensions(
+			bool enableValidationLayers
+		);
 
 	std::vector<const char*>
-	GetDeviceRequiredExtensions(
-		const VkPhysicalDevice& physicalDevice
-	);
+		GetDeviceRequiredExtensions(
+			const VkPhysicalDevice& physicalDevice
+		);
 
 	// ===================
 	// DEVICE
@@ -298,21 +321,21 @@ namespace VulkanUtil
 	* \param VkPhysicalDevice to inspect
 	* \return true if the GPU supports Vulkan
 	*/
-	bool 
-	IsDeviceVulkanCompatible(
-		const VkPhysicalDevice& physicalDeivce
-		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
-	);
+	bool
+		IsDeviceVulkanCompatible(
+			const VkPhysicalDevice& physicalDeivce
+			, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
+		);
 
 	// ===================
 	// SWAPCHAIN
 	// ===================
 
-	SwapchainSupport
-	QuerySwapchainSupport(
-		const VkPhysicalDevice& physicalDevice
-		, const VkSurfaceKHR& surface
-	);
+	Type::SwapchainSupport
+		QuerySwapchainSupport(
+			const VkPhysicalDevice& physicalDevice
+			, const VkSurfaceKHR& surface
+		);
 
 	/**
 	* \brief The surface format specifies color channel and types, and the texcoord space
@@ -322,9 +345,9 @@ namespace VulkanUtil
 
 	*/
 	VkSurfaceFormatKHR
-	SelectDesiredSwapchainSurfaceFormat(
-		const std::vector<VkSurfaceFormatKHR> availableFormats
-	);
+		SelectDesiredSwapchainSurfaceFormat(
+			const std::vector<VkSurfaceFormatKHR> availableFormats
+		);
 
 	/**
 	* \brief This is the most important setting for the swap chain. This is how we select
@@ -363,9 +386,9 @@ namespace VulkanUtil
 	* \ref https://www.khronos.org/registry/vulkan/specs/1.0-wsi_extensions/xhtml/vkspec.html#VkPresentModeKHR
 	*/
 	VkPresentModeKHR
-	SelectDesiredSwapchainPresentMode(
-		const std::vector<VkPresentModeKHR> availablePresentModes
-	);
+		SelectDesiredSwapchainPresentMode(
+			const std::vector<VkPresentModeKHR> availablePresentModes
+		);
 
 	/**
 	* \brief
@@ -377,50 +400,50 @@ namespace VulkanUtil
 	* \ref https://www.khronos.org/registry/vulkan/specs/1.0-wsi_extensions/xhtml/vkspec.html#VkSurfaceCapabilitiesKHR
 	*/
 	VkExtent2D
-	SelectDesiredSwapchainExtent(
-		const VkSurfaceCapabilitiesKHR surfaceCapabilities
-		, bool useCurrentExtent = true
-		, unsigned int desiredWidth = 0 /* unused if useCurrentExtent is true */
-		, unsigned int desiredHeight = 0 /* unused if useCurrentExtent is true */
-	);
+		SelectDesiredSwapchainExtent(
+			const VkSurfaceCapabilitiesKHR surfaceCapabilities
+			, bool useCurrentExtent = true
+			, unsigned int desiredWidth = 0 /* unused if useCurrentExtent is true */
+			, unsigned int desiredHeight = 0 /* unused if useCurrentExtent is true */
+		);
 
 	// ===================
 	// IMAGE
 	// ===================
 
 	/**
-	 * \brief Find a supported format from a list of candidates
-	 * \param physicalDevice 
-	 * \param candidates 
-	 * \param tiling 
-	 * \param features 
-	 * \return 
-	 */
-	VkFormat 
-	FindSupportedFormat(
-		const VkPhysicalDevice& physicalDevice,
-		const std::vector<VkFormat>& candidates,
-		VkImageTiling tiling,
-		VkFormatFeatureFlags features
-	);
+	* \brief Find a supported format from a list of candidates
+	* \param physicalDevice
+	* \param candidates
+	* \param tiling
+	* \param features
+	* \return
+	*/
+	VkFormat
+		FindSupportedFormat(
+			const VkPhysicalDevice& physicalDevice,
+			const std::vector<VkFormat>& candidates,
+			VkImageTiling tiling,
+			VkFormatFeatureFlags features
+		);
 
 	/**
-	 * \brief Find a supported depth format for a given physical device
-	 * \param physicalDevice 
-	 * \return 
-	 */
-	VkFormat 
-	FindDepthFormat(
-		const VkPhysicalDevice& physicalDevice
-	);
+	* \brief Find a supported depth format for a given physical device
+	* \param physicalDevice
+	* \return
+	*/
+	VkFormat
+		FindDepthFormat(
+			const VkPhysicalDevice& physicalDevice
+		);
 
 	/**
-	 * \brief Return true if the VkFormat contains a stencil component
-	 * \param format 
-	 * \return 
-	 */
+	* \brief Return true if the VkFormat contains a stencil component
+	* \param format
+	* \return
+	*/
 	bool
-	DepthFormatHasStencilComponent(
-		VkFormat format
-	);
+		DepthFormatHasStencilComponent(
+			VkFormat format
+		);
 }

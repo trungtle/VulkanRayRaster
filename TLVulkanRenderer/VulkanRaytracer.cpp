@@ -212,7 +212,14 @@ VulkanRaytracer::PrepareComputePipeline()
 		"Failed to create compute pipeline"
 	);
 
-	// 7. Create compute command pool
+	// 7. Create compute command pool 
+	// (separately from graphics command pool in case that they're not on the same queue)
+	VkCommandPoolCreateInfo commandPoolCreateInfo = MakeCommandPoolCreateInfo(m_queueFamilyIndices.computeFamily);
+
+	CheckVulkanResult(
+		vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &compute.commandPool),
+		"Failed to create command pool for compute"
+	);
 
 	// 8. Create compute command buffers
 

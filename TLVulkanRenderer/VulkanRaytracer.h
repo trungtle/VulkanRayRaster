@@ -53,6 +53,9 @@ protected:
 		VkPipelineLayout pipelineLayout;
 		VkPipeline pipeline;
 
+		// -- Commands
+		VkCommandPool commandPool;
+
 		struct {
 			// -- Uniform buffer
 			StorageBuffer uniformBuffer;

@@ -15,6 +15,8 @@
 #include "VulkanUtil.h"
 
 using namespace VulkanUtil;
+using namespace VulkanUtil::Make;
+using namespace VulkanUtil::Type;
 
 // ===================
 // VULKAN RENDERER

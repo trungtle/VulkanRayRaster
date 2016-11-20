@@ -847,9 +847,7 @@ VulkanRenderer::PrepareCommandPool()
 	VkResult result = VK_SUCCESS;
 
 	// Command pool for the graphics queue
-	VkCommandPoolCreateInfo graphicsCommandPoolCreateInfo = {};
-	graphicsCommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	graphicsCommandPoolCreateInfo.queueFamilyIndex = m_queueFamilyIndices.graphicsFamily;
+	VkCommandPoolCreateInfo graphicsCommandPoolCreateInfo = MakeCommandPoolCreateInfo(m_queueFamilyIndices.graphicsFamily);
 
 	result = vkCreateCommandPool(m_device, &graphicsCommandPoolCreateInfo, nullptr, &m_graphicsCommandPool);
 	if (result != VK_SUCCESS) {
@@ -1070,12 +1068,8 @@ VkResult
 VulkanRenderer::PrepareGraphicsCommandBuffers()
 {
 	m_commandBuffers.resize(m_swapchain.framebuffers.size());
-	VkCommandBufferAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = m_graphicsCommandPool;
 	// Primary means that can be submitted to a queue, but cannot be called from other command buffers
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = static_cast<uint32_t>(m_commandBuffers.size());
+	VkCommandBufferAllocateInfo allocInfo = MakeCommandBufferAllocateInfo(m_graphicsCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_swapchain.framebuffers.size());
 
 	VkResult result = vkAllocateCommandBuffers(m_device, &allocInfo, m_commandBuffers.data());
 	if (result != VK_SUCCESS)
