@@ -2,8 +2,8 @@
 #include <functional>
 
 #include "Application.h"
-#include "VulkanRaytracer.h"
-#include "VulkanRaytracer.h"
+#include "renderer/vulkan/VulkanRenderer.h"
+#include "renderer/vulkan/VulkanRaytracer.h"
 
 static int frame;
 static int fpstracker;

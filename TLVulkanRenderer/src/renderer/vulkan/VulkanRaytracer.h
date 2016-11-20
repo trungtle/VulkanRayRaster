@@ -40,12 +40,13 @@ protected:
 	PrepareComputeCommandBuffers() override;
 
 
-	struct
+	struct Compute
 	{
 		// -- Compute compatible queue
 		VkQueue queue;
 
 		// -- Descriptor
+		VkDescriptorPool descriptorPool;
 		VkDescriptorSetLayout descriptorSetLayout;
 		VkDescriptorSet descriptorSets;
 
@@ -55,17 +56,20 @@ protected:
 
 		// -- Commands
 		VkCommandPool commandPool;
+		std::vector<VkCommandBuffer> commandBuffers;
 
 		struct {
 			// -- Uniform buffer
-			StorageBuffer uniformBuffer;
+			StorageBuffer uniform;
 
 			// -- Triangle buffers
-			StorageBuffer trianglesBuffer;
-		} buffer;
+			StorageBuffer triangles;
+		} buffers;
 
 		// -- Output storage image
-		Texture m_rayTracedTexture;
+		Texture storageRaytraceImage;
+
+		void PrepareUniformBuffer();
 
 	} compute;
 

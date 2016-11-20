@@ -59,6 +59,7 @@ Finished base rasterizer code to render a triangle.
 - [VulkanSDK](https://lunarg.com/vulkan-sdk/) by [LunarG](https://vulkan.lunarg.com/)
 - Addthe following paths in Visual Studio project settings (for All Configurations):
  - C/C++ -> General -> Additional Include Directories:
+    - `PATH_TO_PROJECT\TLVulkanRenderer\src`
     - `PATH_TO_PROJECT\TLVulkanRenderer\thirdparty`
     - `PATH_TO_GLFW\glfw\include`
     - `PATH_TO_VULKAN_SDK\VulkanSDK\1.0.26.0\Include`

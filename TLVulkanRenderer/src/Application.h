@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Renderer.h"
-#include "VulkanRenderer.h"
+#include "renderer/Renderer.h"
+#include "renderer/vulkan/VulkanRenderer.h"
 #include "Scene.h"
 
 class Application

@@ -46,17 +46,6 @@ namespace VulkanUtil
 		};
 
 		// ===================
-		// UNIFORM
-		// ===================
-
-		struct UniformBufferObject
-		{
-			glm::mat4 model;
-			glm::mat4 view;
-			glm::mat4 proj;
-		};
-
-		// ===================
 		// BUFFER
 		// ===================
 
@@ -231,6 +220,8 @@ namespace VulkanUtil
 				uint32_t bufferCount
 			);
 	}
+
+	// -----------------------------------------------------
 
 	inline void CheckVulkanResult(
 		VkResult result,
