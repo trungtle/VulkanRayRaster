@@ -9,6 +9,7 @@
 
 #include "VulkanRenderer.h"
 #include "Utilities.h"
+#include "VulkanImage.h"
 
 VulkanRenderer::VulkanRenderer(
 	GLFWwindow* window,
@@ -186,7 +187,7 @@ VulkanRenderer::PrepareRenderPass()
 	// ------ Depth attachment -------
 
 	VkAttachmentDescription depthAttachment = {};
-	depthAttachment.format = FindDepthFormat(m_vulkanDevice->physicalDevice);
+	depthAttachment.format = VulkanImage::FindDepthFormat(m_vulkanDevice->physicalDevice);
 	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Store if we're going to do deferred rendering
@@ -523,7 +524,7 @@ VulkanRenderer::PrepareCommandPool()
 VkResult 
 VulkanRenderer::PrepareDepthResources() 
 {
-	VkFormat depthFormat = FindDepthFormat(m_vulkanDevice->physicalDevice);
+	VkFormat depthFormat = VulkanImage::FindDepthFormat(m_vulkanDevice->physicalDevice);
 
 	CreateImage(
 		m_vulkanDevice->m_swapchain.extent.width,
@@ -1137,7 +1138,7 @@ VulkanRenderer::TransitionImageLayout(
 	imageBarrier.image = image;
 	imageBarrier.subresourceRange.aspectMask = aspectMask;
 	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-		if (DepthFormatHasStencilComponent(format)) {
+		if (VulkanImage::DepthFormatHasStencilComponent(format)) {
 			imageBarrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
 	}

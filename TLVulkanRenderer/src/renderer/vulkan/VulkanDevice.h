@@ -73,16 +73,40 @@ public:
 
 	Swapchain m_swapchain;
 
+	/**
+	* \brief A struct to store queue family indices
+	*/
+	struct QueueFamilyIndices
+	{
+		int graphicsFamily = -1;
+		int presentFamily = -1;
+		int computeFamily = -1;
+		int transferFamily = -1;
+
+		bool IsComplete() const {
+			return graphicsFamily >= 0 && presentFamily >= 0 && computeFamily >= 0 && transferFamily >= 0;
+		}
+	};
 
 	/**
 	* \brief Store the queue family indices
 	*/
-	VulkanUtil::Type::QueueFamilyIndices queueFamilyIndices;
+	QueueFamilyIndices queueFamilyIndices;
 
 	void Initialize(GLFWwindow* window);
 
 	void Destroy();
 
+	/**
+	* \brief Check if this GPU is Vulkan compatible
+	* \param VkPhysicalDevice to inspect
+	* \return true if the GPU supports Vulkan
+	*/
+	static bool
+	IsDeviceVulkanCompatible(
+		const VkPhysicalDevice& physicalDeivce
+		, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
+	);
 
 private:
 	/**
@@ -113,3 +137,25 @@ private:
 		PrepareSwapchain();
 
 };
+
+
+bool
+CheckValidationLayerSupport(
+	const std::vector<const char*>& validationLayers
+);
+
+std::vector<const char*>
+GetInstanceRequiredExtensions(
+	bool enableValidationLayers
+);
+
+std::vector<const char*>
+GetDeviceRequiredExtensions(
+	const VkPhysicalDevice& physicalDevice
+);
+
+VulkanDevice::QueueFamilyIndices
+FindQueueFamilyIndices(
+	const VkPhysicalDevice& physicalDevicece
+	, const VkSurfaceKHR& surfaceKHR // For finding queue that can present image to our surface
+);

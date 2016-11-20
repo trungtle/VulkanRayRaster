@@ -67,7 +67,7 @@ protected:
 		} buffers;
 
 		// -- Output storage image
-		Texture storageRaytraceImage;
+		VulkanImage::Image storageRaytraceImage;
 
 		void PrepareUniformBuffer();
 

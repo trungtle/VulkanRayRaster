@@ -57,6 +57,12 @@
     <ClCompile Include="src\renderer\vulkan\VulkanUtil.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="src\renderer\vulkan\VulkanSwapchain.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\renderer\vulkan\VulkanImage.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -124,6 +130,9 @@
     </ClInclude>
     <ClInclude Include="thirdparty\tinygltfloader\tiny_gltf_loader.h">
       <Filter>Header Files\thirdparty</Filter>
+    </ClInclude>
+    <ClInclude Include="src\renderer\vulkan\VulkanImage.h">
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

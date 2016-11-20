@@ -2,6 +2,11 @@
 #include <set>
 #include <iostream>
 
+// ==================================
+// Layers and extensions
+// ==================================
+
+
 // This is the list of validation layers we want
 const std::vector<const char*> VALIDATION_LAYERS = {
 	"VK_LAYER_LUNARG_standard_validation"
@@ -54,7 +59,9 @@ DestroyDebugReportCallbackEXT(
 	}
 }
 
-// ------------------
+// ==================================
+// Member functions
+// ==================================
 
 VkResult
 VulkanDevice::InitializeVulkanInstance()
@@ -69,7 +76,7 @@ VulkanDevice::InitializeVulkanInstance()
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 
 	// Grab extensions. This includes the KHR surface extension and debug layer if in debug mode
-	std::vector<const char*> extensions = VulkanUtil::GetInstanceRequiredExtensions(isEnableValidationLayers);
+	std::vector<const char*> extensions = GetInstanceRequiredExtensions(isEnableValidationLayers);
 
 	// Create instance info struct
 	VkInstanceCreateInfo instanceCreateInfo = {};
@@ -82,7 +89,7 @@ VulkanDevice::InitializeVulkanInstance()
 	// Grab validation layers
 	if (isEnableValidationLayers)
 	{
-		assert(VulkanUtil::CheckValidationLayerSupport(VALIDATION_LAYERS));
+		assert(CheckValidationLayerSupport(VALIDATION_LAYERS));
 		instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
 		instanceCreateInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
 	}
@@ -143,7 +150,7 @@ VulkanDevice::SelectPhysicalDevice()
 
 	for (auto pd : physicalDevices)
 	{
-		if (VulkanUtil::IsDeviceVulkanCompatible(pd, surfaceKHR))
+		if (IsDeviceVulkanCompatible(pd, surfaceKHR))
 		{
 			physicalDevice = pd;
 			break;
@@ -164,7 +171,7 @@ VulkanDevice::SetupLogicalDevice()
 	deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
 	// Create a set of unique queue families for the required queues
-	queueFamilyIndices = VulkanUtil::FindQueueFamilyIndices(physicalDevice, surfaceKHR);
+	queueFamilyIndices = FindQueueFamilyIndices(physicalDevice, surfaceKHR);
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	std::set<int> uniqueQueueFamilies = { queueFamilyIndices.graphicsFamily, queueFamilyIndices.presentFamily };
 	for (auto i : uniqueQueueFamilies)
@@ -184,14 +191,14 @@ VulkanDevice::SetupLogicalDevice()
 	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 
 	// Grab logical device extensions
-	std::vector<const char*> enabledExtensions = VulkanUtil::GetDeviceRequiredExtensions(physicalDevice);
+	std::vector<const char*> enabledExtensions = GetDeviceRequiredExtensions(physicalDevice);
 	deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size());
 	deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
 	// Grab validation layers
 	if (isEnableValidationLayers)
 	{
-		assert(VulkanUtil::CheckValidationLayerSupport(VALIDATION_LAYERS));
+		assert(CheckValidationLayerSupport(VALIDATION_LAYERS));
 		deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
 		deviceCreateInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
 	}
@@ -210,16 +217,16 @@ VkResult
 VulkanDevice::PrepareSwapchain()
 {
 	// Query existing support
-	VulkanUtil::Type::SwapchainSupport swapchainSupport = VulkanUtil::QuerySwapchainSupport(physicalDevice, surfaceKHR);
+	Swapchain::SwapchainSupport swapchainSupport = Swapchain::QuerySwapchainSupport(physicalDevice, surfaceKHR);
 
 	// Select three settings:
 	// 1. Surface format
 	// 2. Present mode
 	// 3. Extent
 	// @todo Right now the preference is embedded inside these functions. We need to expose it to a global configuration file somewhere instead.
-	VkSurfaceFormatKHR surfaceFormat = VulkanUtil::SelectDesiredSwapchainSurfaceFormat(swapchainSupport.surfaceFormats);
-	VkPresentModeKHR presentMode = VulkanUtil::SelectDesiredSwapchainPresentMode(swapchainSupport.presentModes);
-	VkExtent2D extent = VulkanUtil::SelectDesiredSwapchainExtent(swapchainSupport.capabilities);
+	VkSurfaceFormatKHR surfaceFormat = Swapchain::SelectDesiredSwapchainSurfaceFormat(swapchainSupport.surfaceFormats);
+	VkPresentModeKHR presentMode = Swapchain::SelectDesiredSwapchainPresentMode(swapchainSupport.presentModes);
+	VkExtent2D extent = Swapchain::SelectDesiredSwapchainExtent(swapchainSupport.capabilities);
 
 	// Select the number of images to be in our swapchain queue. To properly implement tripple buffering, 
 	// we might need an extra image in the queue so bumb the count up. Also, create info struct
@@ -363,4 +370,185 @@ VulkanDevice::Destroy()
 	DestroyDebugReportCallbackEXT(instance, debugCallback, nullptr);
 
 	vkDestroyInstance(instance, nullptr);
+}
+
+// ==================================
+// Class functions
+// ==================================
+
+bool
+VulkanDevice::IsDeviceVulkanCompatible(
+	const VkPhysicalDevice& physicalDeivce
+	, const VkSurfaceKHR& surfaceKHR
+)
+{
+	// Can this physical device support all the extensions we'll need (ex. swap chain)
+	std::vector<const char*> requiredExtensions = GetDeviceRequiredExtensions(physicalDeivce);
+	bool hasAllRequiredExtensions = requiredExtensions.size() > 0;
+
+	// Check if we have the device properties desired
+	VkPhysicalDeviceProperties deviceProperties;
+	vkGetPhysicalDeviceProperties(physicalDeivce, &deviceProperties);
+	bool isDiscreteGPU = deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+
+	// Query queue indices
+	VulkanDevice::QueueFamilyIndices queueFamilyIndices = FindQueueFamilyIndices(physicalDeivce, surfaceKHR);
+
+	// Query swapchain support
+	Swapchain::SwapchainSupport swapchainSupport = Swapchain::QuerySwapchainSupport(physicalDeivce, surfaceKHR);
+
+	return hasAllRequiredExtensions &&
+		isDiscreteGPU &&
+		swapchainSupport.IsComplete() &&
+		queueFamilyIndices.IsComplete();
+}
+
+// ==================================
+// Helpers
+// ==================================
+
+bool
+CheckValidationLayerSupport(
+	const std::vector<const char*>& validationLayers
+)
+{
+
+	unsigned int layerCount = 0;
+	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+	std::vector<VkLayerProperties> availalbeLayers(layerCount);
+	vkEnumerateInstanceLayerProperties(&layerCount, availalbeLayers.data());
+
+	// Find the layer
+	for (auto layerName : validationLayers)
+	{
+		bool foundLayer = false;
+		for (auto layerProperty : availalbeLayers)
+		{
+			foundLayer = (strcmp(layerName, layerProperty.layerName) == 0);
+			if (foundLayer)
+			{
+				break;
+			}
+		}
+
+		if (!foundLayer)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+std::vector<const char*>
+GetInstanceRequiredExtensions(
+	bool enableValidationLayers
+)
+{
+	std::vector<const char*> extensions;
+
+	uint32_t extensionCount = 0;
+	const char** glfwExtensions;
+
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&extensionCount);
+
+	for (uint32_t i = 0; i < extensionCount; ++i)
+	{
+		extensions.push_back(glfwExtensions[i]);
+	}
+
+	if (enableValidationLayers)
+	{
+		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	}
+
+	return extensions;
+}
+
+std::vector<const char*>
+GetDeviceRequiredExtensions(
+	const VkPhysicalDevice& physicalDevice
+)
+{
+	const std::vector<const char*> requiredExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
+
+	uint32_t extensionCount = 0;
+	vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
+
+	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+	vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
+
+	for (auto& reqruiedExtension : requiredExtensions)
+	{
+		if (std::find_if(availableExtensions.begin(), availableExtensions.end(),
+			[&reqruiedExtension](const VkExtensionProperties& prop)
+		{
+			return strcmp(prop.extensionName, reqruiedExtension) == 0;
+		}) == availableExtensions.end())
+		{
+			// Couldn't find this extension, return an empty list
+			return{};
+		}
+	}
+
+	return requiredExtensions;
+}
+
+VulkanDevice::QueueFamilyIndices
+FindQueueFamilyIndices(
+	const VkPhysicalDevice& physicalDeivce
+	, const VkSurfaceKHR& surfaceKHR
+)
+{
+	VulkanDevice::QueueFamilyIndices queueFamilyIndices;
+
+	uint32_t queueFamilyPropertyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDeivce, &queueFamilyPropertyCount, nullptr);
+
+	std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyPropertyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDeivce, &queueFamilyPropertyCount, queueFamilyProperties.data());
+
+	int i = 0;
+	for (const auto& queueFamily : queueFamilyProperties)
+	{
+		// We need at least one graphics queue
+		if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+		{
+			queueFamilyIndices.graphicsFamily = i;
+		}
+
+		// We need at least one queue that can present image to the KHR surface.
+		// This could be a different queue from our graphics queue.
+		// @todo: enforce graphics queue and present queue to be the same?
+		VkBool32 presentationSupport = false;
+		vkGetPhysicalDeviceSurfaceSupportKHR(physicalDeivce, i, surfaceKHR, &presentationSupport);
+
+		if (queueFamily.queueCount > 0 && presentationSupport)
+		{
+			queueFamilyIndices.presentFamily = i;
+		}
+
+		// Query compute queue family
+		if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
+		{
+			queueFamilyIndices.computeFamily = i;
+		}
+
+		// Query memory transfer family
+		if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)
+		{
+			queueFamilyIndices.transferFamily = i;
+		}
+
+		if (queueFamilyIndices.IsComplete())
+		{
+			break;
+		}
+
+		++i;
+	}
+
+	return queueFamilyIndices;
 }

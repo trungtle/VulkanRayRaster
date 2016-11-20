@@ -14,6 +14,7 @@
 #include "VulkanSwapchain.h"
 #include "VulkanUtil.h"
 #include "Typedef.h"
+#include "VulkanImage.h"
 
 using namespace VulkanUtil;
 using namespace VulkanUtil::Make;
@@ -246,7 +247,7 @@ protected:
 		*/
 		VkRenderPass m_renderPass;
 
-		Texture m_depthTexture;
+		VulkanImage::Image m_depthTexture;
 
 		std::vector<GeometryBuffer> m_geometryBuffers;
 		
