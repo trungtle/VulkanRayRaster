@@ -1,5 +1,6 @@
 #pragma once
 #include "VulkanRenderer.h"
+#include "VulkanBuffer.h"
 
 class VulkanRaytracer : public VulkanRenderer {
 	
@@ -60,10 +61,10 @@ protected:
 
 		struct {
 			// -- Uniform buffer
-			StorageBuffer uniform;
+			VulkanBuffer::StorageBuffer uniform;
 
 			// -- Triangle buffers
-			StorageBuffer triangles;
+			VulkanBuffer::StorageBuffer triangles;
 		} buffers;
 
 		// -- Output storage image

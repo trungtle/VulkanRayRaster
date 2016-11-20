@@ -6,13 +6,8 @@
 
 namespace VulkanUtil
 {
-
-
-
 	namespace Make
 	{
-
-
 		VkDescriptorPoolSize
 			MakeDescriptorPoolSize(
 				VkDescriptorType type,

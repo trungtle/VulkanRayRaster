@@ -166,12 +166,14 @@
     <ClInclude Include="src\Camera.h" />
     <ClInclude Include="src\GeometryBase.h" />
     <ClInclude Include="src\renderer\Renderer.h" />
+    <ClInclude Include="src\renderer\vulkan\VulkanBuffer.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanDevice.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanImage.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanRaytracer.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanRenderer.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanSwapchain.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanUtil.h" />
+    <ClInclude Include="src\renderer\vulkan\VulkanVertex.h" />
     <ClInclude Include="src\Scene.h" />
     <ClInclude Include="src\SceneUtil.h" />
     <ClInclude Include="src\Typedef.h" />

@@ -10,6 +10,8 @@
 #include "VulkanRenderer.h"
 #include "Utilities.h"
 #include "VulkanImage.h"
+#include "VulkanBuffer.h"
+#include "VulkanVertex.h"
 
 VulkanRenderer::VulkanRenderer(
 	GLFWwindow* window,
@@ -108,7 +110,7 @@ VulkanRenderer::~VulkanRenderer()
 	vkDestroyImage(m_vulkanDevice->device, graphics.m_depthTexture.image, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, graphics.m_depthTexture.imageMemory, nullptr);
 
-	for (GeometryBuffer& geomBuffer : graphics.m_geometryBuffers) {
+	for (VulkanBuffer::GeometryBuffer& geomBuffer : graphics.m_geometryBuffers) {
 		vkFreeMemory(m_vulkanDevice->device, geomBuffer.vertexBufferMemory, nullptr);
 		vkDestroyBuffer(m_vulkanDevice->device, geomBuffer.vertexBuffer, nullptr);
 	}
@@ -309,14 +311,14 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 	
 	// Input binding description
 	VkVertexInputBindingDescription bindingDesc[2] = {
-		GetVertexInputBindingDescription(0, m_scene->m_geometriesData[0]->vertexAttributes.at(POSITION)),
-		GetVertexInputBindingDescription(1, m_scene->m_geometriesData[0]->vertexAttributes.at(NORMAL))
+		VulkanVertex::GetVertexInputBindingDescription(0, m_scene->m_geometriesData[0]->vertexAttributes.at(POSITION)),
+		VulkanVertex::GetVertexInputBindingDescription(1, m_scene->m_geometriesData[0]->vertexAttributes.at(NORMAL))
 	};
 	vertexInputStageCreateInfo.vertexBindingDescriptionCount = 2;
 	vertexInputStageCreateInfo.pVertexBindingDescriptions = bindingDesc;
 	
 	// Attribute description (position, normal, texcoord etc.)
-	auto vertAttribDesc = GetAttributeDescriptions();
+	auto vertAttribDesc = VulkanVertex::GetVertexInputAttributeDescriptions();
 	vertexInputStageCreateInfo.vertexAttributeDescriptionCount = vertAttribDesc.size();
 	vertexInputStageCreateInfo.pVertexAttributeDescriptions = vertAttribDesc.data();
 
@@ -562,7 +564,7 @@ VulkanRenderer::PrepareVertexBuffer()
 {
 	for (GeometryData* geomData : m_scene->m_geometriesData)
 	{
-		GeometryBuffer geomBuffer;
+		VulkanBuffer::GeometryBuffer geomBuffer;
 
 		// ----------- Vertex attributes --------------
 
@@ -773,7 +775,7 @@ VulkanRenderer::PrepareGraphicsCommandBuffers()
 
 		for (int b = 0; b <graphics.m_geometryBuffers.size(); ++b)
 		{
-			GeometryBuffer& geomBuffer = graphics.m_geometryBuffers[b];
+			VulkanBuffer::GeometryBuffer& geomBuffer = graphics.m_geometryBuffers[b];
 
 			// Bind vertex buffer
 			VkBuffer vertexBuffers[] = { geomBuffer.vertexBuffer, geomBuffer.vertexBuffer };

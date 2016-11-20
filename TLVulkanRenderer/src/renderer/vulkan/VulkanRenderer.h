@@ -15,10 +15,10 @@
 #include "VulkanUtil.h"
 #include "Typedef.h"
 #include "VulkanImage.h"
+#include "VulkanBuffer.h"
 
 using namespace VulkanUtil;
 using namespace VulkanUtil::Make;
-using namespace VulkanUtil::Type;
 
 struct GraphicsUniformBufferObject
 {
@@ -249,7 +249,7 @@ protected:
 
 		VulkanImage::Image m_depthTexture;
 
-		std::vector<GeometryBuffer> m_geometryBuffers;
+		std::vector<VulkanBuffer::GeometryBuffer> m_geometryBuffers;
 		
 		/**
 		* \brief Uniform buffers

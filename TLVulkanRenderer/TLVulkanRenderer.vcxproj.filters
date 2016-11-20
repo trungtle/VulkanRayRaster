@@ -134,6 +134,12 @@
     <ClInclude Include="src\renderer\vulkan\VulkanImage.h">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="src\renderer\vulkan\VulkanBuffer.h">
+      <Filter>Header Files\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\renderer\vulkan\VulkanVertex.h">
+      <Filter>Header Files\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\fragShader.frag">
