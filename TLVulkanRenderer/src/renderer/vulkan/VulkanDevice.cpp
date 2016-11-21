@@ -321,6 +321,92 @@ VulkanDevice::PrepareSwapchain()
 	return result;
 }
 
+VkResult
+VulkanDevice::PrepareDepthResources(
+	const VkQueue& queue,
+	const VkCommandPool& commandPool
+	)
+{
+	VkFormat depthFormat = VulkanImage::FindDepthFormat(physicalDevice);
+
+	CreateImage(
+		m_swapchain.extent.width,
+		m_swapchain.extent.height,
+		1, // only a 2D depth image
+		VK_IMAGE_TYPE_2D,
+		depthFormat,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_depthTexture.image,
+		m_depthTexture.imageMemory
+	);
+	CreateImageView(
+		m_depthTexture.image,
+		VK_IMAGE_VIEW_TYPE_2D,
+		depthFormat,
+		VK_IMAGE_ASPECT_DEPTH_BIT,
+		m_depthTexture.imageView
+	);
+
+	TransitionImageLayout(
+		queue,
+		commandPool,
+		m_depthTexture.image,
+		depthFormat,
+		VK_IMAGE_ASPECT_DEPTH_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	);
+
+	return VK_SUCCESS;
+}
+
+VkResult
+VulkanDevice::PrepareFramebuffers(
+	const VkRenderPass& renderpass
+	)
+{
+	VkResult result = VK_SUCCESS;
+
+	m_swapchain.imageViews.resize(m_swapchain.images.size());
+	for (auto i = 0; i < m_swapchain.imageViews.size(); ++i)
+	{
+		CreateImageView(
+			m_swapchain.images[i],
+			VK_IMAGE_VIEW_TYPE_2D,
+			m_swapchain.imageFormat,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			m_swapchain.imageViews[i]
+		);
+	}
+
+	m_swapchain.framebuffers.resize(m_swapchain.imageViews.size());
+
+	// Attach image views to framebuffers
+	for (int i = 0; i < m_swapchain.imageViews.size(); ++i)
+	{
+		std::array<VkImageView, 2> imageViews = { m_swapchain.imageViews[i], m_depthTexture.imageView };
+
+		VkFramebufferCreateInfo framebufferCreateInfo = {};
+		framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferCreateInfo.renderPass = renderpass;
+		framebufferCreateInfo.attachmentCount = imageViews.size();
+		framebufferCreateInfo.pAttachments = imageViews.data();
+		framebufferCreateInfo.width = m_swapchain.extent.width;
+		framebufferCreateInfo.height =m_swapchain.extent.height;
+		framebufferCreateInfo.layers = 1;
+
+		result = vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &m_swapchain.framebuffers[i]);
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create framebuffer");
+			return result;
+		}
+	}
+
+	return result;
+}
 
 // =====================
 
@@ -362,6 +448,10 @@ void VulkanDevice::Initialize(GLFWwindow* window)
 void 
 VulkanDevice::Destroy() 
 {
+	vkDestroyImageView(device, m_depthTexture.imageView, nullptr);
+	vkDestroyImage(device, m_depthTexture.image, nullptr);
+	vkFreeMemory(device, m_depthTexture.imageMemory, nullptr);
+
 	vkDestroySwapchainKHR(device, m_swapchain.swapchain, nullptr);
 
 	vkDestroyDevice(device, nullptr);

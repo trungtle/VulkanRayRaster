@@ -11,7 +11,6 @@
 #include "Utilities.h"
 #include "VulkanImage.h"
 #include "VulkanBuffer.h"
-#include "VulkanVertex.h"
 
 VulkanRenderer::VulkanRenderer(
 	GLFWwindow* window,
@@ -21,6 +20,7 @@ VulkanRenderer::VulkanRenderer(
 	Renderer(window, scene)
 {
     // -- Initialize logger
+
     // Combine console and file logger
     std::vector<spdlog::sink_ptr> sinks;
     sinks.push_back(std::make_shared<spdlog::sinks::stdout_sink_st>());
@@ -30,70 +30,22 @@ VulkanRenderer::VulkanRenderer(
     m_logger->set_pattern("<%H:%M:%S>[%I] %v");
 
 	// -- Initialize Vulkan
+
 	m_vulkanDevice = new VulkanDevice(m_window, "Vulkan renderer", m_logger);
 
 	// Grabs the first queue in the graphics queue family since we only need one graphics queue anyway
-	vkGetDeviceQueue(m_vulkanDevice->device, m_vulkanDevice->queueFamilyIndices.graphicsFamily, 0, &graphics.m_graphicsQueue);
+	vkGetDeviceQueue(m_vulkanDevice->device, m_vulkanDevice->queueFamilyIndices.graphicsFamily, 0, &m_graphics.queue);
 
 	// Grabs the first queue in the present queue family since we only need one present queue anyway
 	vkGetDeviceQueue(m_vulkanDevice->device, m_vulkanDevice->queueFamilyIndices.presentFamily, 0, &m_presentQueue);
 
-	VkResult result;
+	// -- Prepare graphics work
+	PrepareGraphics();
 
-	result = PrepareDescriptorPool();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created descriptor pool");
-
-	result = PrepareDescriptorSetLayout();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created descriptor set layout");
-
-	result = PrepareCommandPool();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created command pool");
-
-	result = PrepareRenderPass();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created renderpass");
-
-	result = PrepareDepthResources();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created depth image");
-
-	result = PrepareImageViews();
-	assert(result == VK_SUCCESS);
-	m_logger->info("Created {} VkImageViews", m_vulkanDevice->m_swapchain.imageViews.size());
-
-	result = PrepareFramebuffers();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created framebuffers");
-
-	result = PrepareGraphicsPipeline();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created graphics pipeline");
-
-	result = PrepareVertexBuffer();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created vertex buffer");
-
-	result = PrepareUniformBuffer();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created uniform buffer");
-
-	result = PrepareGraphicsDescriptorSets();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created descriptor set");
-
-	result = PrepareGraphicsCommandBuffers();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created command buffers");
-
-	result = PrepareSemaphores();
-	assert(result == VK_SUCCESS);
-	m_logger->info<std::string>("Created semaphores");
+	// -- Prepare compute work
+	PrepareCompute();
 
 }
-
 
 VulkanRenderer::~VulkanRenderer()
 {
@@ -102,62 +54,38 @@ VulkanRenderer::~VulkanRenderer()
 	vkDestroySemaphore(m_vulkanDevice->device, m_imageAvailableSemaphore, nullptr);
 	vkDestroySemaphore(m_vulkanDevice->device, m_renderFinishedSemaphore, nullptr);
 	
-	vkFreeCommandBuffers(m_vulkanDevice->device, graphics.m_graphicsCommandPool, graphics.m_commandBuffers.size(), graphics.m_commandBuffers.data());
+	vkFreeCommandBuffers(m_vulkanDevice->device, m_graphics.commandPool, m_graphics.m_commandBuffers.size(), m_graphics.m_commandBuffers.data());
 	
-	vkDestroyDescriptorPool(m_vulkanDevice->device, graphics.descriptorPool, nullptr);
+	vkDestroyDescriptorPool(m_vulkanDevice->device, m_graphics.descriptorPool, nullptr);
 
-	vkDestroyImageView(m_vulkanDevice->device, graphics.m_depthTexture.imageView, nullptr);
-	vkDestroyImage(m_vulkanDevice->device, graphics.m_depthTexture.image, nullptr);
-	vkFreeMemory(m_vulkanDevice->device, graphics.m_depthTexture.imageMemory, nullptr);
-
-	for (VulkanBuffer::GeometryBuffer& geomBuffer : graphics.m_geometryBuffers) {
+	for (VulkanBuffer::GeometryBuffer& geomBuffer : m_graphics.m_geometryBuffers) {
 		vkFreeMemory(m_vulkanDevice->device, geomBuffer.vertexBufferMemory, nullptr);
 		vkDestroyBuffer(m_vulkanDevice->device, geomBuffer.vertexBuffer, nullptr);
 	}
 
-	vkFreeMemory(m_vulkanDevice->device, graphics.m_uniformStagingBufferMemory, nullptr);
-	vkDestroyBuffer(m_vulkanDevice->device, graphics.m_uniformStagingBuffer, nullptr);
-	vkFreeMemory(m_vulkanDevice->device, graphics.m_uniformBufferMemory, nullptr);
-	vkDestroyBuffer(m_vulkanDevice->device, graphics.m_uniformBuffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_graphics.m_uniformStagingBufferMemory, nullptr);
+	vkDestroyBuffer(m_vulkanDevice->device, m_graphics.m_uniformStagingBuffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_graphics.m_uniformBufferMemory, nullptr);
+	vkDestroyBuffer(m_vulkanDevice->device, m_graphics.m_uniformBuffer, nullptr);
 	
-	vkDestroyCommandPool(m_vulkanDevice->device, graphics.m_graphicsCommandPool, nullptr);
+	vkDestroyCommandPool(m_vulkanDevice->device, m_graphics.commandPool, nullptr);
 	for (auto& frameBuffer : m_vulkanDevice->m_swapchain.framebuffers) {
 		vkDestroyFramebuffer(m_vulkanDevice->device, frameBuffer, nullptr);
 	}
 	
-	vkDestroyRenderPass(m_vulkanDevice->device, graphics.m_renderPass, nullptr);
+	vkDestroyRenderPass(m_vulkanDevice->device, m_graphics.renderPass, nullptr);
 	
-	vkDestroyDescriptorSetLayout(m_vulkanDevice->device, graphics.descriptorSetLayout, nullptr);
+	vkDestroyDescriptorSetLayout(m_vulkanDevice->device, m_graphics.descriptorSetLayout, nullptr);
 	
-	vkDestroyPipelineLayout(m_vulkanDevice->device, graphics.pipelineLayout, nullptr);
+	vkDestroyPipelineLayout(m_vulkanDevice->device, m_graphics.pipelineLayout, nullptr);
 	for (auto& imageView : m_vulkanDevice->m_swapchain.imageViews) {
         vkDestroyImageView(m_vulkanDevice->device, imageView, nullptr);
     }
-	vkDestroyPipeline(m_vulkanDevice->device, graphics.m_graphicsPipeline, nullptr);
+	vkDestroyPipeline(m_vulkanDevice->device, m_graphics.m_graphicsPipeline, nullptr);
 	
 	delete m_vulkanDevice;
 }
 
-
-
-
-VkResult 
-VulkanRenderer::PrepareImageViews() 
-{
-    VkResult result = VK_SUCCESS;
-
-	m_vulkanDevice->m_swapchain.imageViews.resize(m_vulkanDevice->m_swapchain.images.size());
-    for (auto i = 0; i < m_vulkanDevice->m_swapchain.imageViews.size(); ++i) {
-		m_vulkanDevice->CreateImageView(
-			m_vulkanDevice->m_swapchain.images[i],
-			VK_IMAGE_VIEW_TYPE_2D,
-			m_vulkanDevice->m_swapchain.imageFormat,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			m_vulkanDevice->m_swapchain.imageViews[i]
-		);
-    }
-    return result;
-}
 
 VkResult 
 VulkanRenderer::PrepareRenderPass() 
@@ -233,7 +161,7 @@ VulkanRenderer::PrepareRenderPass()
 	renderPassCreateInfo.dependencyCount = 1;
 	renderPassCreateInfo.pDependencies = &subpassDependency;
 
-	VkResult result = vkCreateRenderPass(m_vulkanDevice->device, &renderPassCreateInfo, nullptr, &graphics.m_renderPass);
+	VkResult result = vkCreateRenderPass(m_vulkanDevice->device, &renderPassCreateInfo, nullptr, &m_graphics.renderPass);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create render pass");
 		return result;
@@ -243,7 +171,7 @@ VulkanRenderer::PrepareRenderPass()
 }
 
 VkResult 
-VulkanRenderer::PrepareDescriptorSetLayout() 
+VulkanRenderer::PrepareGraphicsDescriptorSetLayout() 
 {
 	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 		// Binding 0: Fragment shader image sampler
@@ -260,7 +188,7 @@ VulkanRenderer::PrepareDescriptorSetLayout()
 			setLayoutBindings.size()
 		);
 
-	VkResult result = vkCreateDescriptorSetLayout(m_vulkanDevice->device, &descriptorSetLayoutCreateInfo, nullptr, &graphics.descriptorSetLayout);
+	VkResult result = vkCreateDescriptorSetLayout(m_vulkanDevice->device, &descriptorSetLayoutCreateInfo, nullptr, &m_graphics.descriptorSetLayout);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create descriptor set layout");
 		return result;
@@ -284,20 +212,44 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineVertexInputStateCreateInfo
 	// 1. Vertex input stage
-	VkPipelineVertexInputStateCreateInfo vertexInputStageCreateInfo = MakePipelineVertexInputStateCreateInfo();
-	
 	// Input binding description
-	VkVertexInputBindingDescription bindingDesc[2] = {
-		VulkanVertex::GetVertexInputBindingDescription(0, m_scene->m_geometriesData[0]->vertexAttributes.at(POSITION)),
-		VulkanVertex::GetVertexInputBindingDescription(1, m_scene->m_geometriesData[0]->vertexAttributes.at(NORMAL))
+	VertexAttributeInfo positionAttrib = m_scene->m_geometriesData[0]->vertexAttributes.at(POSITION);
+	VertexAttributeInfo normalAttrib = m_scene->m_geometriesData[0]->vertexAttributes.at(NORMAL);
+	std::vector<VkVertexInputBindingDescription> bindingDesc = {
+		MakeVertexInputBindingDescription(
+			0, // binding
+			positionAttrib.byteStride,
+			VK_VERTEX_INPUT_RATE_VERTEX
+			),
+		MakeVertexInputBindingDescription(
+			1, // binding
+			normalAttrib.byteStride,
+			VK_VERTEX_INPUT_RATE_VERTEX
+		)
 	};
-	vertexInputStageCreateInfo.vertexBindingDescriptionCount = 2;
-	vertexInputStageCreateInfo.pVertexBindingDescriptions = bindingDesc;
+
 	
 	// Attribute description (position, normal, texcoord etc.)
-	auto vertAttribDesc = VulkanVertex::GetVertexInputAttributeDescriptions();
-	vertexInputStageCreateInfo.vertexAttributeDescriptionCount = vertAttribDesc.size();
-	vertexInputStageCreateInfo.pVertexAttributeDescriptions = vertAttribDesc.data();
+	std::vector<VkVertexInputAttributeDescription> attribDesc = {
+		MakeVertexInputAttributeDescription(
+			0, // binding
+			0, // location
+			VK_FORMAT_R32G32B32_SFLOAT,
+			0  // offset
+			),
+		MakeVertexInputAttributeDescription(
+			1, // binding
+			1, // location
+			VK_FORMAT_R32G32B32_SFLOAT,
+			0  // offset
+		)
+	};
+
+	VkPipelineVertexInputStateCreateInfo vertexInputStageCreateInfo = MakePipelineVertexInputStateCreateInfo(
+		bindingDesc,
+		attribDesc
+		);
+
 
 	// 2. Input assembly
 	// \see https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#VkPipelineInputAssemblyStateCreateInfo
@@ -357,10 +309,10 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 	// 8. Dynamic state. Some pipeline states can be updated dynamically. Skip for now.
 
 	// 9. Create pipeline layout to hold uniforms. This can be modified dynamically. 
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = MakePipelineLayoutCreateInfo(&graphics.descriptorSetLayout);
-	pipelineLayoutCreateInfo.pSetLayouts = &graphics.descriptorSetLayout;
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = MakePipelineLayoutCreateInfo(&m_graphics.descriptorSetLayout);
+	pipelineLayoutCreateInfo.pSetLayouts = &m_graphics.descriptorSetLayout;
 	CheckVulkanResult(
-		vkCreatePipelineLayout(m_vulkanDevice->device, &pipelineLayoutCreateInfo, nullptr, &graphics.pipelineLayout),
+		vkCreatePipelineLayout(m_vulkanDevice->device, &pipelineLayoutCreateInfo, nullptr, &m_graphics.pipelineLayout),
 		"Failed to create pipeline layout."
 		);
 
@@ -386,8 +338,8 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 			&multisampleStateCreateInfo,
 			&depthStencilStateCreateInfo,
 			nullptr,
-			graphics.pipelineLayout,
-			graphics.m_renderPass,
+			m_graphics.pipelineLayout,
+			m_graphics.renderPass,
 			0, // Subpass
 
 			// Since pipelins are expensive to create, potentially we could reuse a common parent pipeline using the base pipeline handle.									
@@ -404,7 +356,7 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 		1,								// Pipeline count
 		&graphicsPipelineCreateInfo, 
 		nullptr, 
-		&graphics.m_graphicsPipeline	// Pipelines
+		&m_graphics.m_graphicsPipeline	// Pipelines
 		),
 		"Failed to create graphics pipeline"
 		);
@@ -417,52 +369,14 @@ VulkanRenderer::PrepareGraphicsPipeline() {
 }
 
 VkResult 
-VulkanRenderer::PrepareComputePipeline() 
-{
-
-	return VK_SUCCESS;
-}
-
-VkResult 
-VulkanRenderer::PrepareFramebuffers() 
-{
-	VkResult result = VK_SUCCESS;
-
-	m_vulkanDevice->m_swapchain.framebuffers.resize(m_vulkanDevice->m_swapchain.imageViews.size());
-
-	// Attach image views to framebuffers
-	for (int i = 0; i < m_vulkanDevice->m_swapchain.imageViews.size(); ++i)
-	{
-		std::array<VkImageView, 2> imageViews = { m_vulkanDevice->m_swapchain.imageViews[i], graphics.m_depthTexture.imageView };
-
-		VkFramebufferCreateInfo framebufferCreateInfo = {};
-		framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferCreateInfo.renderPass = graphics.m_renderPass;
-		framebufferCreateInfo.attachmentCount = imageViews.size();
-		framebufferCreateInfo.pAttachments = imageViews.data();
-		framebufferCreateInfo.width = m_vulkanDevice->m_swapchain.extent.width;
-		framebufferCreateInfo.height = m_vulkanDevice->m_swapchain.extent.height;
-		framebufferCreateInfo.layers = 1;
-
-		result = vkCreateFramebuffer(m_vulkanDevice->device, &framebufferCreateInfo, nullptr, &m_vulkanDevice->m_swapchain.framebuffers[i]);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create framebuffer");
-			return result;
-		}
-	}
-
-	return result;
-}
-
-VkResult 
-VulkanRenderer::PrepareCommandPool() 
+VulkanRenderer::PrepareGraphicsCommandPool() 
 {
 	VkResult result = VK_SUCCESS;
 
 	// Command pool for the graphics queue
 	VkCommandPoolCreateInfo graphicsCommandPoolCreateInfo = MakeCommandPoolCreateInfo(m_vulkanDevice->queueFamilyIndices.graphicsFamily);
 
-	result = vkCreateCommandPool(m_vulkanDevice->device, &graphicsCommandPoolCreateInfo, nullptr, &graphics.m_graphicsCommandPool);
+	result = vkCreateCommandPool(m_vulkanDevice->device, &graphicsCommandPoolCreateInfo, nullptr, &m_graphics.commandPool);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create command pool.");
 		return result;
@@ -472,47 +386,9 @@ VulkanRenderer::PrepareCommandPool()
 }
 
 VkResult 
-VulkanRenderer::PrepareDepthResources() 
+VulkanRenderer::PrepareGraphicsVertexBuffer()
 {
-	VkFormat depthFormat = VulkanImage::FindDepthFormat(m_vulkanDevice->physicalDevice);
-
-	m_vulkanDevice->CreateImage(
-		m_vulkanDevice->m_swapchain.extent.width,
-		m_vulkanDevice->m_swapchain.extent.height,
-		1, // only a 2D depth image
-		VK_IMAGE_TYPE_2D,
-		depthFormat,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		graphics.m_depthTexture.image,
-		graphics.m_depthTexture.imageMemory
-	);
-	m_vulkanDevice->CreateImageView(
-		graphics.m_depthTexture.image,
-		VK_IMAGE_VIEW_TYPE_2D,
-		depthFormat,
-		VK_IMAGE_ASPECT_DEPTH_BIT,
-		graphics.m_depthTexture.imageView
-	);
-
-	m_vulkanDevice->TransitionImageLayout(
-		graphics.m_graphicsQueue,
-		graphics.m_graphicsCommandPool,
-		graphics.m_depthTexture.image,
-		depthFormat,
-		VK_IMAGE_ASPECT_DEPTH_BIT,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-	);
-
-	return VK_SUCCESS;
-}
-
-VkResult 
-VulkanRenderer::PrepareVertexBuffer()
-{
-	graphics.m_geometryBuffers.clear();
+	m_graphics.m_geometryBuffers.clear();
 
 	for (GeometryData* geomData : m_scene->m_geometriesData)
 	{
@@ -587,8 +463,8 @@ VulkanRenderer::PrepareVertexBuffer()
 
 		// Copy over to vertex buffer in device local memory
 		m_vulkanDevice->CopyBuffer(
-			graphics.m_graphicsQueue,
-			graphics.m_graphicsCommandPool,
+			m_graphics.queue,
+			m_graphics.commandPool,
 			geomBuffer.vertexBuffer, 
 			stagingBuffer, 
 			bufferSize
@@ -598,61 +474,61 @@ VulkanRenderer::PrepareVertexBuffer()
 		vkDestroyBuffer(m_vulkanDevice->device, stagingBuffer, nullptr);
 		vkFreeMemory(m_vulkanDevice->device, stagingBufferMemory, nullptr);
 
-		graphics.m_geometryBuffers.push_back(geomBuffer);
+		m_graphics.m_geometryBuffers.push_back(geomBuffer);
 	}
 	return VK_SUCCESS;
 }
 
 
 VkResult 
-VulkanRenderer::PrepareUniformBuffer()
+VulkanRenderer::PrepareGraphicsUniformBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(GraphicsUniformBufferObject);
 	VkDeviceSize memoryOffset = 0;
 	m_vulkanDevice->CreateBuffer(
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		graphics.m_uniformStagingBuffer
+		m_graphics.m_uniformStagingBuffer
 	);
 
 	// Allocate memory for the buffer
 	m_vulkanDevice->CreateMemory(
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		graphics.m_uniformStagingBuffer,
-		graphics.m_uniformStagingBufferMemory
+		m_graphics.m_uniformStagingBuffer,
+		m_graphics.m_uniformStagingBufferMemory
 	);
 
 	// Bind buffer with memory
-	vkBindBufferMemory(m_vulkanDevice->device, graphics.m_uniformStagingBuffer, graphics.m_uniformStagingBufferMemory, memoryOffset);
+	vkBindBufferMemory(m_vulkanDevice->device, m_graphics.m_uniformStagingBuffer, m_graphics.m_uniformStagingBufferMemory, memoryOffset);
 
 	m_vulkanDevice->CreateBuffer(
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		graphics.m_uniformBuffer
+		m_graphics.m_uniformBuffer
 	);
 
 	// Allocate memory for the buffer
 	m_vulkanDevice->CreateMemory(
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		graphics.m_uniformBuffer,
-		graphics.m_uniformBufferMemory
+		m_graphics.m_uniformBuffer,
+		m_graphics.m_uniformBufferMemory
 	);
 
 	// Bind buffer with memory
-	vkBindBufferMemory(m_vulkanDevice->device, graphics.m_uniformBuffer, graphics.m_uniformBufferMemory, memoryOffset);
+	vkBindBufferMemory(m_vulkanDevice->device, m_graphics.m_uniformBuffer, m_graphics.m_uniformBufferMemory, memoryOffset);
 
 	return VK_SUCCESS;
 }
 
 VkResult 
-VulkanRenderer::PrepareDescriptorPool() 
+VulkanRenderer::PrepareGraphicsDescriptorPool() 
 {
 	VkDescriptorPoolSize poolSize = MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
 
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = MakeDescriptorPoolCreateInfo(1, &poolSize, 1);
 
 	CheckVulkanResult(
-		vkCreateDescriptorPool(m_vulkanDevice->device, &descriptorPoolCreateInfo, nullptr, &graphics.descriptorPool),
+		vkCreateDescriptorPool(m_vulkanDevice->device, &descriptorPoolCreateInfo, nullptr, &m_graphics.descriptorPool),
 		"Failed to create descriptor pool"
 	);
 
@@ -662,19 +538,19 @@ VulkanRenderer::PrepareDescriptorPool()
 VkResult 
 VulkanRenderer::PrepareGraphicsDescriptorSets() 
 {
-	VkDescriptorSetAllocateInfo allocInfo = MakeDescriptorSetAllocateInfo(graphics.descriptorPool, &graphics.descriptorSetLayout);
+	VkDescriptorSetAllocateInfo allocInfo = MakeDescriptorSetAllocateInfo(m_graphics.descriptorPool, &m_graphics.descriptorSetLayout);
 
 	CheckVulkanResult(
-		vkAllocateDescriptorSets(m_vulkanDevice->device, &allocInfo, &graphics.descriptorSets),
+		vkAllocateDescriptorSets(m_vulkanDevice->device, &allocInfo, &m_graphics.descriptorSets),
 		"Failed to allocate descriptor set"
 	);
 
-	VkDescriptorBufferInfo bufferInfo = MakeDescriptorBufferInfo(graphics.m_uniformBuffer, 0, sizeof(GraphicsUniformBufferObject));
+	VkDescriptorBufferInfo bufferInfo = MakeDescriptorBufferInfo(m_graphics.m_uniformBuffer, 0, sizeof(GraphicsUniformBufferObject));
 
 	// Update descriptor set info
 	VkWriteDescriptorSet descriptorWrite = MakeWriteDescriptorSet(
 		VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		graphics.descriptorSets,
+		m_graphics.descriptorSets,
 		0,
 		1,
 		&bufferInfo,
@@ -689,30 +565,30 @@ VulkanRenderer::PrepareGraphicsDescriptorSets()
 VkResult 
 VulkanRenderer::PrepareGraphicsCommandBuffers()
 {
-	graphics.m_commandBuffers.resize(m_vulkanDevice->m_swapchain.framebuffers.size());
+	m_graphics.m_commandBuffers.resize(m_vulkanDevice->m_swapchain.framebuffers.size());
 	// Primary means that can be submitted to a queue, but cannot be called from other command buffers
-	VkCommandBufferAllocateInfo allocInfo = MakeCommandBufferAllocateInfo(graphics.m_graphicsCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_vulkanDevice->m_swapchain.framebuffers.size());
+	VkCommandBufferAllocateInfo allocInfo = MakeCommandBufferAllocateInfo(m_graphics.commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_vulkanDevice->m_swapchain.framebuffers.size());
 
-	VkResult result = vkAllocateCommandBuffers(m_vulkanDevice->device, &allocInfo, graphics.m_commandBuffers.data());
+	VkResult result = vkAllocateCommandBuffers(m_vulkanDevice->device, &allocInfo, m_graphics.m_commandBuffers.data());
 	if (result != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create command buffers.");
 		return result;
 	}
 
-	for (int i = 0; i < graphics.m_commandBuffers.size(); ++i)
+	for (int i = 0; i < m_graphics.m_commandBuffers.size(); ++i)
 	{
 		// Begin command recording
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
-		vkBeginCommandBuffer(graphics.m_commandBuffers[i], &beginInfo);
+		vkBeginCommandBuffer(m_graphics.m_commandBuffers[i], &beginInfo);
 
 		// Begin renderpass
 		VkRenderPassBeginInfo renderPassBeginInfo = {};
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = graphics.m_renderPass;
+		renderPassBeginInfo.renderPass = m_graphics.renderPass;
 		renderPassBeginInfo.framebuffer = m_vulkanDevice->m_swapchain.framebuffers[i];
 
 		// The area where load and store takes place
@@ -726,35 +602,35 @@ VulkanRenderer::PrepareGraphicsCommandBuffers()
 		renderPassBeginInfo.pClearValues = clearValues.data();
 
 		// Record begin renderpass
-		vkCmdBeginRenderPass(graphics.m_commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(m_graphics.m_commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		// Record binding the graphics pipeline
-		vkCmdBindPipeline(graphics.m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.m_graphicsPipeline);
+		vkCmdBindPipeline(m_graphics.m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphics.m_graphicsPipeline);
 
-		for (int b = 0; b <graphics.m_geometryBuffers.size(); ++b)
+		for (int b = 0; b <m_graphics.m_geometryBuffers.size(); ++b)
 		{
-			VulkanBuffer::GeometryBuffer& geomBuffer = graphics.m_geometryBuffers[b];
+			VulkanBuffer::GeometryBuffer& geomBuffer = m_graphics.m_geometryBuffers[b];
 
 			// Bind vertex buffer
 			VkBuffer vertexBuffers[] = { geomBuffer.vertexBuffer, geomBuffer.vertexBuffer };
 			VkDeviceSize offsets[] = { geomBuffer.bufferLayout.vertexBufferOffsets.at(POSITION), geomBuffer.bufferLayout.vertexBufferOffsets.at(NORMAL) };
-			vkCmdBindVertexBuffers(graphics.m_commandBuffers[i], 0, 2, vertexBuffers, offsets);
+			vkCmdBindVertexBuffers(m_graphics.m_commandBuffers[i], 0, 2, vertexBuffers, offsets);
 
 			// Bind index buffer
-			vkCmdBindIndexBuffer(graphics.m_commandBuffers[i], geomBuffer.vertexBuffer, geomBuffer.bufferLayout.vertexBufferOffsets.at(INDEX), VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(m_graphics.m_commandBuffers[i], geomBuffer.vertexBuffer, geomBuffer.bufferLayout.vertexBufferOffsets.at(INDEX), VK_INDEX_TYPE_UINT16);
 
 			// Bind uniform buffer
-			vkCmdBindDescriptorSets(graphics.m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSets, 0, nullptr);
+			vkCmdBindDescriptorSets(m_graphics.m_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphics.pipelineLayout, 0, 1, &m_graphics.descriptorSets, 0, nullptr);
 
 			// Record draw command for the triangle!
-			vkCmdDrawIndexed(graphics.m_commandBuffers[i], m_scene->m_geometriesData[b]->vertexAttributes.at(INDEX).count, 1, 0, 0, 0);
+			vkCmdDrawIndexed(m_graphics.m_commandBuffers[i], m_scene->m_geometriesData[b]->vertexAttributes.at(INDEX).count, 1, 0, 0, 0);
 		}
 
 		// Record end renderpass
-		vkCmdEndRenderPass(graphics.m_commandBuffers[i]);
+		vkCmdEndRenderPass(m_graphics.m_commandBuffers[i]);
 
 		// End command recording
-		result = vkEndCommandBuffer(graphics.m_commandBuffers[i]);
+		result = vkEndCommandBuffer(m_graphics.m_commandBuffers[i]);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to record command buffers");
 			return result;
@@ -811,6 +687,59 @@ VulkanRenderer::PrepareShaderModule(
 	return result;
 }
 
+void 
+VulkanRenderer::PrepareGraphics() 
+{
+	VkResult result;
+
+	result = PrepareGraphicsDescriptorPool();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created descriptor pool");
+
+	result = PrepareGraphicsDescriptorSetLayout();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created descriptor set layout");
+
+	result = PrepareGraphicsCommandPool();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created command pool");
+
+	result = m_vulkanDevice->PrepareDepthResources(m_graphics.queue, m_graphics.commandPool);
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created depth image");
+
+	result = PrepareRenderPass();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created renderpass");
+
+	result = m_vulkanDevice->PrepareFramebuffers(m_graphics.renderPass);
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created framebuffers");
+
+	result = PrepareGraphicsPipeline();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created graphics pipeline");
+
+	result = PrepareGraphicsVertexBuffer();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created vertex buffer");
+
+	result = PrepareGraphicsUniformBuffer();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created graphics uniform buffer");
+
+	result = PrepareGraphicsDescriptorSets();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created descriptor set");
+
+	result = PrepareGraphicsCommandBuffers();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created command buffers");
+
+	result = PrepareSemaphores();
+	assert(result == VK_SUCCESS);
+	m_logger->info<std::string>("Created semaphores");
+}
 
 void
 VulkanRenderer::Update()
@@ -830,15 +759,15 @@ VulkanRenderer::Update()
 	ubo.proj[1][1] *= -1;
 
 	void* data;
-	vkMapMemory(m_vulkanDevice->device, graphics.m_uniformStagingBufferMemory, 0, sizeof(GraphicsUniformBufferObject), 0, &data);
+	vkMapMemory(m_vulkanDevice->device, m_graphics.m_uniformStagingBufferMemory, 0, sizeof(GraphicsUniformBufferObject), 0, &data);
 	memcpy(data, &ubo, sizeof(GraphicsUniformBufferObject));
-	vkUnmapMemory(m_vulkanDevice->device, graphics.m_uniformStagingBufferMemory);
+	vkUnmapMemory(m_vulkanDevice->device, m_graphics.m_uniformStagingBufferMemory);
 
 	m_vulkanDevice->CopyBuffer(
-		graphics.m_graphicsQueue,
-		graphics.m_graphicsCommandPool,
-		graphics.m_uniformBuffer, 
-		graphics.m_uniformStagingBuffer, 
+		m_graphics.queue,
+		m_graphics.commandPool,
+		m_graphics.m_uniformBuffer, 
+		m_graphics.m_uniformStagingBuffer, 
 		sizeof(GraphicsUniformBufferObject));
 }
 
@@ -869,7 +798,7 @@ VulkanRenderer::Render()
 	
 	// The command buffer to submit
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &graphics.m_commandBuffers[imageIndex];
+	submitInfo.pCommandBuffers = &m_graphics.m_commandBuffers[imageIndex];
 
 	// Semaphore to signal
 	VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphore };
@@ -877,7 +806,7 @@ VulkanRenderer::Render()
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
 	// Submit to queue
-	VkResult result = vkQueueSubmit(graphics.m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	VkResult result = vkQueueSubmit(m_graphics.queue, 1, &submitInfo, VK_NULL_HANDLE);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to submit queue");
 	}
@@ -893,7 +822,7 @@ VulkanRenderer::Render()
 	presentInfo.pSwapchains = swapchains;
 	presentInfo.pImageIndices = &imageIndex;
 
-	vkQueuePresentKHR(graphics.m_graphicsQueue, &presentInfo);
+	vkQueuePresentKHR(m_graphics.queue, &presentInfo);
 }
 
 

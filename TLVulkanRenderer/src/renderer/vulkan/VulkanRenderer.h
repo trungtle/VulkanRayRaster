@@ -52,15 +52,18 @@ public:
 
 protected:
 	
-    VkResult
-    PrepareImageViews();
-
 	VkResult
-	PrepareRenderPass();
+	PrepareShaderModule(
+		const std::string& filepath,
+		VkShaderModule& shaderModule
+	) const;
 
 	// ----------------
-	// PIPELINES
+	// GRAPHICS PIPELINE
 	// ----------------
+
+	virtual void
+	PrepareGraphics();
 
 	/**
 	 * \brief The graphics pipeline are often fixed. Create a new pipeline if we need a different pipeline settings
@@ -70,35 +73,23 @@ protected:
 	PrepareGraphicsPipeline();
 
 	virtual VkResult
-	PrepareComputePipeline();
-
-	VkResult
-	PrepareShaderModule(
-		const std::string& filepath,
-		VkShaderModule& shaderModule
-		) const;
-
-	VkResult
-	PrepareFramebuffers();
-
-	VkResult
-	PrepareDepthResources();
+	PrepareGraphicsVertexBuffer();
 
 	virtual VkResult
-	PrepareVertexBuffer();
+	PrepareGraphicsUniformBuffer();
 
-	virtual VkResult
-	PrepareUniformBuffer();
+	VkResult
+	PrepareRenderPass();
 
 	// -----------
 	// DESCRIPTOR
 	// -----------
 
 	virtual VkResult
-	PrepareDescriptorPool();
+	PrepareGraphicsDescriptorPool();
 
 	virtual VkResult
-	PrepareDescriptorSetLayout();
+	PrepareGraphicsDescriptorSetLayout();
 
 	virtual VkResult
 	PrepareGraphicsDescriptorSets();
@@ -113,15 +104,10 @@ protected:
 	* \return
 	*/
 	VkResult
-	PrepareCommandPool();
+	PrepareGraphicsCommandPool();
 
 	virtual VkResult
 	PrepareGraphicsCommandBuffers();
-
-	virtual VkResult
-	PrepareComputeCommandBuffers() {
-		return VK_SUCCESS;
-	};
 
 	// ----------------
 	// SYCHRONIZATION
@@ -129,6 +115,13 @@ protected:
 
 	VkResult
 	PrepareSemaphores();
+
+	// ----------------
+	// COMPUTE PIPELINE
+	// ----------------
+
+	virtual void
+	PrepareCompute() {} ;
 
 	/**
 	* \brief Helper to determine the memory type to allocate from our graphics card
@@ -170,9 +163,7 @@ protected:
 		/**
 		* \brief Holds the renderpass object. This also represents the framebuffer attachments
 		*/
-		VkRenderPass m_renderPass;
-
-		VulkanImage::Image m_depthTexture;
+		VkRenderPass renderPass;
 
 		std::vector<VulkanBuffer::GeometryBuffer> m_geometryBuffers;
 		
@@ -192,7 +183,7 @@ protected:
 		/**
 		* \brief Command pool
 		*/
-		VkCommandPool m_graphicsCommandPool;
+		VkCommandPool commandPool;
 
 		/**
 		* \brief Command buffers to record our commands
@@ -203,9 +194,9 @@ protected:
 		* \brief Handles to the Vulkan graphics queue. This may or may not be the same as the present queue
 		* \ref https://www.khronos.org/registry/vulkan/specs/1.0-wsi_extensions/xhtml/vkspec.html#devsandqueues-queues
 		*/
-		VkQueue m_graphicsQueue;
+		VkQueue queue;
 
-	} graphics;
+	} m_graphics;
 
 	/**
 	 * \brief Semaphores to signal when to acquire and present swapchain images

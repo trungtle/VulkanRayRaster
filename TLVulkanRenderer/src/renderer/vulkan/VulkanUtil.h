@@ -71,8 +71,26 @@ namespace VulkanUtil
 		// ===================
 		// PIPELINE
 		// ===================
+		VkVertexInputBindingDescription
+		MakeVertexInputBindingDescription(
+			uint32_t binding,
+			uint32_t stride,
+			VkVertexInputRate rate
+		);
+
+		VkVertexInputAttributeDescription
+		MakeVertexInputAttributeDescription(
+			uint32_t binding,
+			uint32_t location,
+			VkFormat format,
+			uint32_t offset
+		);
+
 		VkPipelineVertexInputStateCreateInfo
-		MakePipelineVertexInputStateCreateInfo();
+		MakePipelineVertexInputStateCreateInfo(
+			const std::vector<VkVertexInputBindingDescription>& bindingDesc,
+			const std::vector<VkVertexInputAttributeDescription>& attribDesc
+			);
 
 		VkPipelineInputAssemblyStateCreateInfo
 		MakePipelineInputAssemblyStateCreateInfo(

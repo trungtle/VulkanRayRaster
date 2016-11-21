@@ -125,11 +125,53 @@ namespace VulkanUtil
 			return writeDescriptorSet;
 		}
 
-		VkPipelineVertexInputStateCreateInfo 
-		MakePipelineVertexInputStateCreateInfo() 
+		VkVertexInputBindingDescription 
+		MakeVertexInputBindingDescription(
+			uint32_t binding, 
+			uint32_t stride, 
+			VkVertexInputRate rate
+			) 
+		{
+			VkVertexInputBindingDescription bindingDesc;
+			bindingDesc.binding = binding;
+			bindingDesc.stride = stride;
+			bindingDesc.inputRate = rate;
+
+			return bindingDesc;
+		}
+
+		VkVertexInputAttributeDescription 
+		MakeVertexInputAttributeDescription(
+			uint32_t binding, 
+			uint32_t location, 
+			VkFormat format, 
+			uint32_t offset
+			) 
+		{
+			VkVertexInputAttributeDescription attributeDesc;
+
+			// Position attribute
+			attributeDesc.binding = binding;
+			attributeDesc.location = location;
+			attributeDesc.format = format;
+			attributeDesc.offset = offset;
+
+			return attributeDesc;
+		}
+
+		VkPipelineVertexInputStateCreateInfo
+		MakePipelineVertexInputStateCreateInfo(
+			const std::vector<VkVertexInputBindingDescription>& bindingDesc,
+			const std::vector<VkVertexInputAttributeDescription>& attribDesc
+			)
 		{
 			VkPipelineVertexInputStateCreateInfo vertexInputStageCreateInfo = {};
 			vertexInputStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+			vertexInputStageCreateInfo.vertexBindingDescriptionCount = bindingDesc.size();
+			vertexInputStageCreateInfo.pVertexBindingDescriptions = bindingDesc.data();
+			vertexInputStageCreateInfo.vertexAttributeDescriptionCount = attribDesc.size();
+			vertexInputStageCreateInfo.pVertexAttributeDescriptions = attribDesc.data();
 
 			return vertexInputStageCreateInfo;
 		}

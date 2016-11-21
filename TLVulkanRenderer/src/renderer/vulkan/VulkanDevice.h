@@ -7,6 +7,7 @@
 #include "VulkanUtil.h"
 #include <GLFW/glfw3.h>
 #include <spdlog/logger.h>
+#include "VulkanImage.h"
 
 class VulkanDevice {
 
@@ -73,6 +74,8 @@ public:
 
 	Swapchain m_swapchain;
 
+	VulkanImage::Image m_depthTexture;
+
 	/**
 	* \brief A struct to store queue family indices
 	*/
@@ -105,6 +108,17 @@ public:
 
 	void 
 	Destroy();
+
+	VkResult
+	PrepareDepthResources(
+		const VkQueue& queue,
+		const VkCommandPool& commandPool
+	);
+
+	VkResult
+	PrepareFramebuffers(
+		const VkRenderPass& renderpass
+	);
 
 	uint32_t
 	GetMemoryType(

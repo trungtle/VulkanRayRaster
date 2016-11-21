@@ -15,46 +15,48 @@ public:
 protected:
 
 	// -----------
-	// BUFFER
+	// GRAPHICS PIPELINE
 	// -----------
-	VkResult
-	PrepareVertexBuffer() final;
-
-	// -----------
-	// DESCRIPTOR
-	// -----------
-
-	VkResult
-	PrepareDescriptorPool() final;
-
-	VkResult
-	PrepareDescriptorSetLayout() final;
-
-	VkResult
-	PrepareGraphicsDescriptorSets() final;
-
-	VkResult
-	CreateRayTraceTextureResources();
-
-	// -----------
-	// PIPELINE
-	// -----------
+	void
+	PrepareGraphics() final;
 
 	VkResult
 	PrepareGraphicsPipeline() final;
 
 	VkResult
-	PrepareComputePipeline() final;
+	PrepareGraphicsVertexBuffer() final;
 
-	// -----------
-	// COMMANDS
-	// -----------
+	// --- Descriptor
+
+	VkResult
+	PrepareGraphicsDescriptorPool() final;
+
+	VkResult
+	PrepareGraphicsDescriptorSetLayout() final;
+
+	VkResult
+	PrepareGraphicsDescriptorSets() final;
+
+	// --- Command buffers
 
 	VkResult
 	PrepareGraphicsCommandBuffers() final;
 
+	// -----------
+	// COMPUTE PIPELINE (for raytracing)
+	// -----------
+
+	void
+	PrepareCompute() final;
+
 	VkResult
-	PrepareComputeCommandBuffers() final;
+	PrepareRayTraceTextureResources();
+
+	VkResult
+	PrepareComputePipeline();
+
+	VkResult
+	PrepareComputeCommandBuffers();
 
 
 	struct Compute
@@ -85,8 +87,6 @@ protected:
 
 		// -- Output storage image
 		VulkanImage::Image storageRaytraceImage;
-
-		void PrepareUniformBuffer();
 
 	} compute;
 

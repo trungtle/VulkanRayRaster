@@ -173,7 +173,6 @@
     <ClInclude Include="src\renderer\vulkan\VulkanRenderer.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanSwapchain.h" />
     <ClInclude Include="src\renderer\vulkan\VulkanUtil.h" />
-    <ClInclude Include="src\renderer\vulkan\VulkanVertex.h" />
     <ClInclude Include="src\Scene.h" />
     <ClInclude Include="src\SceneUtil.h" />
     <ClInclude Include="src\Typedef.h" />
