@@ -1160,7 +1160,7 @@ Scene::Scene(
 					}
 				}
 
-				m_geometriesData.push_back(geom);
+				geometriesData.push_back(geom);
 			}
 		}
 	}
@@ -1171,7 +1171,7 @@ Scene::Scene(
 
 Scene::~Scene()
 {
-	for (GeometryData* geom : m_geometriesData) {
+	for (GeometryData* geom : geometriesData) {
 		delete geom;
 		geom = nullptr;
 	}

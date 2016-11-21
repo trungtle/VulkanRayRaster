@@ -58,6 +58,9 @@ protected:
 		VkShaderModule& shaderModule
 	) const;
 
+	VkResult
+	PrepareRenderPass();
+
 	// ----------------
 	// GRAPHICS PIPELINE
 	// ----------------
@@ -77,9 +80,6 @@ protected:
 
 	virtual VkResult
 	PrepareGraphicsUniformBuffer();
-
-	VkResult
-	PrepareRenderPass();
 
 	// -----------
 	// DESCRIPTOR
@@ -165,7 +165,7 @@ protected:
 		*/
 		VkRenderPass renderPass;
 
-		std::vector<VulkanBuffer::GeometryBuffer> m_geometryBuffers;
+		std::vector<VulkanBuffer::GeometryBuffer> geometryBuffers;
 		
 		/**
 		* \brief Uniform buffers
@@ -188,7 +188,7 @@ protected:
 		/**
 		* \brief Command buffers to record our commands
 		*/
-		std::vector<VkCommandBuffer> m_commandBuffers;
+		std::vector<VkCommandBuffer> commandBuffers;
 
 		/**
 		* \brief Handles to the Vulkan graphics queue. This may or may not be the same as the present queue

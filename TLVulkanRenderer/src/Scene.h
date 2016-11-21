@@ -11,7 +11,7 @@ public:
 	Scene(std::string fileName);
 	~Scene();
 	
-	std::vector<GeometryData*> m_geometriesData;
+	std::vector<GeometryData*> geometriesData;
 	std::vector<Material> m_materials;
 };
 

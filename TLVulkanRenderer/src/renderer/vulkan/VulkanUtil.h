@@ -14,6 +14,16 @@ namespace VulkanUtil
 	namespace Make
 	{
 		// ===================
+		// DEVICE
+		// ===================
+		VkPresentInfoKHR
+		MakePresentInfoKHR(
+			const std::vector<VkSemaphore>& waitSemaphores,
+			const std::vector<VkSwapchainKHR>& swapchain,
+			const uint32_t* imageIndices
+		);
+
+		// ===================
 		// DESCRIPTOR
 		// ===================
 
@@ -164,34 +174,67 @@ namespace VulkanUtil
 		);
 
 		VkComputePipelineCreateInfo
-			MakeComputePipelineCreateInfo(
-				VkPipelineLayout layout,
-				VkPipelineCreateFlags flags
-			);
+		MakeComputePipelineCreateInfo(
+			VkPipelineLayout layout,
+			VkPipelineCreateFlags flags
+		);
+
+		// ===================
+		// RENDERPASS
+		// ===================
+		VkRenderPassBeginInfo
+		MakeRenderPassBeginInfo(
+			const VkRenderPass& renderPass,
+			const VkFramebuffer& framebuffer,
+			const VkOffset2D& offset,
+			const VkExtent2D& extent,
+			const std::vector<VkClearValue>& clearValues // for each attachment
+		);
 
 		// ===================
 		// TEXTURE
 		// ===================
-
 		void
-			MakeDefaultTextureSampler(
-				const VkDevice& device,
-				VkSampler* sampler
-			);
+		MakeDefaultTextureSampler(
+			const VkDevice& device,
+			VkSampler* sampler
+		);
+
 		// ===================
 		// COMMANDS
 		// ===================
 		VkCommandPoolCreateInfo
-			MakeCommandPoolCreateInfo(
-				uint32_t queueFamilyIndex
-			);
+		MakeCommandPoolCreateInfo(
+			uint32_t queueFamilyIndex
+		);
 
 		VkCommandBufferAllocateInfo
-			MakeCommandBufferAllocateInfo(
-				VkCommandPool commandPool,
-				VkCommandBufferLevel level,
-				uint32_t bufferCount
-			);
+		MakeCommandBufferAllocateInfo(
+			VkCommandPool commandPool,
+			VkCommandBufferLevel level,
+			uint32_t bufferCount
+		);
+
+		VkCommandBufferBeginInfo
+		MakeCommandBufferBeginInfo();
+
+		VkSubmitInfo
+		MakeSubmitInfo(
+			const std::vector<VkSemaphore>& waitSemaphores,
+			const std::vector<VkSemaphore>& signalSemaphores,
+			const std::vector<VkPipelineStageFlags>& waitStageFlags,
+			const VkCommandBuffer& commandBuffer
+		);
+
+		VkSubmitInfo
+		MakeSubmitInfo(
+			const VkCommandBuffer& commandBuffer
+		);
+
+		VkFenceCreateInfo
+		MakeFenceCreateInfo(
+			VkFenceCreateFlags flags
+		);
 	}
 
 	// -----------------------------------------------------

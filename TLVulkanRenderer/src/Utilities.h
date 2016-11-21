@@ -1,6 +1,10 @@
 #pragma once
 
 #include "Typedef.h"
+#include <glm/glm.hpp>
+
+glm::vec4
+NormalizeColor(int r, int g, int b, int alpha);
 
 /**
  * \brief Read a binary file and returns its bytes

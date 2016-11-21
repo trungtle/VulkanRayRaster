@@ -3,6 +3,12 @@
 
 #include "Utilities.h"
 
+glm::vec4 
+NormalizeColor(int r, int g, int b, int alpha) 
+{
+	return glm::vec4(r, g, b, alpha) / 255.0f;
+}
+
 std::vector<Byte> 
 ReadBinaryFile(
 	const std::string& fileName	

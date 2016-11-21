@@ -8,6 +8,25 @@ namespace VulkanUtil
 {
 	namespace Make
 	{
+		VkPresentInfoKHR 
+		MakePresentInfoKHR(
+			const std::vector<VkSemaphore>& waitSemaphores,
+			const std::vector<VkSwapchainKHR>& swapchain,
+			const uint32_t* imageIndices
+			) 
+		{
+			VkPresentInfoKHR presentInfo = {};
+			presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+			presentInfo.waitSemaphoreCount = waitSemaphores.size();
+			presentInfo.pWaitSemaphores = waitSemaphores.data();
+
+			presentInfo.swapchainCount = swapchain.size();
+			presentInfo.pSwapchains = swapchain.data();
+			presentInfo.pImageIndices = imageIndices;
+
+			return presentInfo;
+		}
+
 		VkDescriptorPoolSize
 			MakeDescriptorPoolSize(
 				VkDescriptorType type,
@@ -323,6 +342,30 @@ namespace VulkanUtil
 			return createInfo;
 		}
 
+		VkRenderPassBeginInfo 
+		MakeRenderPassBeginInfo(
+			const VkRenderPass& renderPass, 
+			const VkFramebuffer& framebuffer, 
+			const VkOffset2D& offset, 
+			const VkExtent2D& extent, 
+			const std::vector<VkClearValue>& clearValues
+			) 
+		{
+			VkRenderPassBeginInfo renderPassBeginInfo = {};
+			renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassBeginInfo.renderPass = renderPass;
+			renderPassBeginInfo.framebuffer = framebuffer;
+
+			// The area where load and store takes place
+			renderPassBeginInfo.renderArea.offset = offset;
+			renderPassBeginInfo.renderArea.extent = extent;
+
+			renderPassBeginInfo.clearValueCount = clearValues.size();
+			renderPassBeginInfo.pClearValues = clearValues.data();
+
+			return renderPassBeginInfo;
+		}
+
 		VkPipelineShaderStageCreateInfo
 			MakePipelineShaderStageCreateInfo(
 				VkShaderStageFlagBits stage,
@@ -437,6 +480,71 @@ namespace VulkanUtil
 			allocInfo.commandBufferCount = bufferCount;
 
 			return allocInfo;
+		}
+
+		VkCommandBufferBeginInfo 
+		MakeCommandBufferBeginInfo() 
+		{
+			VkCommandBufferBeginInfo beginInfo = {};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+			return beginInfo;
+		}
+
+		VkSubmitInfo 
+		MakeSubmitInfo(
+			const std::vector<VkSemaphore>& waitSemaphores, 
+			const std::vector<VkSemaphore>& signalSemaphores, 
+			const std::vector<VkPipelineStageFlags>& waitStageFlags, 
+			const VkCommandBuffer& commandBuffer
+			) 
+		{
+			VkSubmitInfo submitInfo = {};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+			// Semaphore to wait on
+			submitInfo.waitSemaphoreCount = waitSemaphores.size();
+			submitInfo.pWaitSemaphores = waitSemaphores.data(); // The semaphore to wait on
+			submitInfo.pWaitDstStageMask = waitStageFlags.data(); // At which stage to wait on
+
+			// The command buffer to submit													
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &commandBuffer;
+
+			// Semaphore to signal
+			submitInfo.signalSemaphoreCount = signalSemaphores.size();
+			submitInfo.pSignalSemaphores = signalSemaphores.data();
+
+			return submitInfo;
+		}
+
+		VkSubmitInfo 
+		MakeSubmitInfo(
+			const VkCommandBuffer& commandBuffer
+			) 
+		{
+			VkSubmitInfo submitInfo = {};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+			// The command buffer to submit													
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &commandBuffer;
+
+			return submitInfo;
+		}
+
+		VkFenceCreateInfo 
+		MakeFenceCreateInfo(
+			VkFenceCreateFlags flags
+			) 
+		{
+			VkFenceCreateInfo createInfo = {};
+
+			createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+			createInfo.flags = flags;
+
+			return createInfo;
 		}
 	}
 }

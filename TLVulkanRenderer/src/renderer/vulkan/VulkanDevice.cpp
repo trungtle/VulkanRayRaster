@@ -898,6 +898,12 @@ VulkanDevice::TransitionImageLayout(
 		imageBarrier.srcAccessMask = 0;
 		imageBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+		newLayout == VK_IMAGE_LAYOUT_GENERAL)
+	{
+		imageBarrier.srcAccessMask = 0;
+		imageBarrier.dstAccessMask = 0;
+	}
 	else
 	{
 		throw std::invalid_argument("Unsupported layout transition");

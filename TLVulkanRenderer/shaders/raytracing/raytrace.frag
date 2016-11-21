@@ -10,5 +10,5 @@ layout(location = 0) out vec4 o_color;
 
 void main() {
 	o_color = texture(s_sampler, vec2(f_uv.s, 1.0 - f_uv.t));
-	o_color = vec4(1,0,0,1);
+	//o_color = vec4(1,0,0,1);
 }
