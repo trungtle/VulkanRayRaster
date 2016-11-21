@@ -30,66 +30,21 @@ Part of the goal for this project is also to learn about explicit graphics API f
 ![A](TLVulkanRenderer/images/DefRayTracing.png)
 _Image taken from [Practical techniques for ray-tracing in games](http://www.gamasutra.com/blogs/AlexandruVoica/20140318/213148/Practical_techniques_for_ray_tracing_in_games.php)_
  
-### Milestones
-
-1. Deferred rendering with G-buffer: positions, normals, materials ID, albedo. Naive ray tracing and acceleration structure (kd-tree).
-2. Raytracing on G-buffer using compute.
-3. Performance analysis: comparing hybrid ray-raster with traditional deferred rendering and raytracing.
-
  
 ### Plan
  1. A basic Vulkan deferred renderer with glTF mesh support.
  2. Ray tracing for transparent objects using compute shaders.
  3. Physically accurate shadows and better support for anti-aliasing via ray tracing.
  4. An acceleration data structure, BVH or kd-tree, for ray tracing. (Async Compute)
- 5. (stretch) Async compute for multithreading.
+ 5. Async compute for multithreading.
  
-# Build
+## Credits
+* [Practical techniques for ray-tracing in games](http://www.gamasutra.com/blogs/AlexandruVoica/20140318/213148/Practical_techniques_for_ray_tracing_in_games.php)
+* [GDCVault14: Practical techniques for ray-tracing in games] (http://www.gdcvault.com/play/1020688/Practical-Techniques-for-Ray-Tracing)
+* [Vulkan, Industry Forged](https://www.khronos.org/vulkan/)
+* [Asynchronous Compute in DX12 & Vulkan: Dispelling Myths & Misconceptions Concurrently](https://youtu.be/XOGIDMJThto)
+* [Doom benchmarks return: Vulkan vs. OpenGL](http://www.pcgamer.com/doom-benchmarks-return-vulkan-vs-opengl/2/)
+* [Rise of the Tomb Raider async compute update boosts performance on AMD hardware](https://www.extremetech.com/gaming/231481-rise-of-the-tomb-raider-async-compute-update-improves-performance-on-amd-hardware-flat-on-maxwell)
+* [Imagination PowerVR 6XT GR6500 mobile GPU - Ray Tracing demos vs Nvidia Geforce GTX 980 Ti](https://youtu.be/ND96G9UZxxA)
 
-- Build using x64 Visual Studio 2015 on Windows with a [Vulkan](https://www.khronos.org/vulkan/) support graphics card (Most discrete GPU in the last couple years should have Vulkan support). You can also check [NVIDIA support](https://developer.nvidia.com/vulkan-driver).
-- [glfw 3.2.1](http://www.glfw.org/)
-- [glm](http://glm.g-truc.net/0.9.8/index.html) library by [G-Truc Creation](http://www.g-truc.net/)
-- [VulkanSDK](https://lunarg.com/vulkan-sdk/) by [LunarG](https://vulkan.lunarg.com/)
-- Addthe following paths in Visual Studio project settings (for All Configurations):
- - C/C++ -> General -> Additional Include Directories:
-    - `PATH_TO_PROJECT\TLVulkanRenderer\src`
-    - `PATH_TO_PROJECT\TLVulkanRenderer\thirdparty`
-    - `PATH_TO_GLFW\glfw\include`
-    - `PATH_TO_VULKAN_SDK\VulkanSDK\1.0.26.0\Include`
-    - `PATH_TO_GLM\glm`
- - Linker -> General -> Additional Library Directories:
-    - `PATH_TO_VULKAN_SDK\VulkanSDK\1.0.26.0\Bin`
-    - `PATH_TO_GLM\glfw-3.2.1.bin.WIN64\lib-vc2015`
- - Linker -> Input -> Additional Dependencies:
-    - `vulkan-1.lib`
-    - `glfw3.lib`
-
-# Third party
-
- - [tinygltfloader](https://github.com/syoyo/tinygltfloader) by [@soyoyo](https://github.com/syoyo)
- - [obj2gltf](https://github.com/AnalyticalGraphicsInc/OBJ2GLTF) by [AnalyticalGraphicsInc](https://github.com/AnalyticalGraphicsInc)
- - [spdlog](https://github.com/gabime/spdlog) by [gabime](https://github.com/gabime/) (see LICENSE for details on LICENSE)
-
-### References
-
-  - [Vulkan Tutorial](https://vulkan-tutorial.com/) by Alexander Overvoorde. [Github](https://github.com/Overv/VulkanTutorial). 
-  - WSI Tutorial by Chris Hebert
-  - [Vulkan Samples](https://github.com/SaschaWillems/Vulkan) by Sascha Willems
-  - [Vulkan Whitepaper](https://www.kdab.com/wp-content/uploads/stories/KDAB-whitepaper-Vulkan-2016-01-v4.pdf)
-  - [Vulkan 1.0.28 - A Specification](https://www.khronos.org/registry/vulkan/specs/1.0-wsi_extensions/pdf/vkspec.pdf)
-  * [Practical techniques for ray-tracing in games](http://www.gamasutra.com/blogs/AlexandruVoica/20140318/213148/Practical_techniques_for_ray_tracing_in_games.php)
-  * [GDCVault14: Practical techniques for ray-tracing in games] (http://www.gdcvault.com/play/1020688/Practical-Techniques-for-Ray-Tracing)
-  * [Vulkan, Industry Forged](https://www.khronos.org/vulkan/)
-  * [Asynchronous Compute in DX12 & Vulkan: Dispelling Myths & Misconceptions Concurrently](https://youtu.be/XOGIDMJThto)
-  * [Doom benchmarks return: Vulkan vs. OpenGL](http://www.pcgamer.com/doom-benchmarks-return-vulkan-vs-opengl/2/)
-  * [Rise of the Tomb Raider async compute update boosts performance on AMD hardware](https://www.extremetech.com/gaming/231481-rise-of-the-tomb-raider-async-compute-update-improves-performance-on-amd-hardware-flat-on-maxwell)
-  * [Imagination PowerVR 6XT GR6500 mobile GPU - Ray Tracing demos vs Nvidia Geforce GTX 980 Ti](https://youtu.be/ND96G9UZxxA)
-
- ### Models
-
-* [glTF Sample Models](https://github.com/KhronosGroup/glTF/blob/master/sampleModels/README.md)
-* [octocat]() by [Sally Kong](https://sketchfab.com/models/cad2ffa5d8a24423ab246ee0916a7f3e). Model is converted using [obj2gltf](https://github.com/AnalyticalGraphicsInc/OBJ2GLTF).
-* [wolf]() by [Rachel Hwang](https://www.linkedin.com/in/rachel-hwang-84a3b989). Model is converted using [obj2gltf](https://github.com/AnalyticalGraphicsInc/OBJ2GLTF).
-* [centaur model](http://tf3dm.com/3d-model/free-base-mesh-centaur--67384.html) by [BAQStudio](http://tf3dm.com/user/baqstudio), Model is converted using [obj2gltf](https://github.com/AnalyticalGraphicsInc/OBJ2GLTF).
-* Infinite, [3D Head Scan]() by Lee Perry-Smith is licensed under a Creative Commons Attribution 3.0 Unported License. Based on a work at www.triplegangers.com. This distribution was created by Morgan McGuire and Guedis Cardenas http://graphics.cs.williams.edu/data/. See [LICENSE](/gltfs/head/Infinite-Scan_License.txt). Model is converted using [obj2gltf](https://github.com/AnalyticalGraphicsInc/OBJ2GLTF).
-
+ 
