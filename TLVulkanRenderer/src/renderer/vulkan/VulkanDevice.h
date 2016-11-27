@@ -141,6 +141,15 @@ public:
 	) const;
 
 	void
+	CreateBufferAndMemory(
+		const VkDeviceSize size,
+		const VkBufferUsageFlags usage,
+		const VkMemoryPropertyFlags memoryProperties,
+		VkBuffer& buffer,
+		VkDeviceMemory& memory
+	) const;
+
+	void
 	CopyBuffer(
 		VkQueue queue,
 		VkCommandPool commandPool,

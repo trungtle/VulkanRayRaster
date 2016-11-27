@@ -30,31 +30,26 @@ struct Camera
 
 Camera camera;
 
-
-
 layout (binding = 1) uniform UBO 
 {
 	vec3 lightPos;
 	vec3 position;   
 	vec3 right;
-	float aspectRatio;
 	vec3 lookat;
 	vec3 forward;
 	vec3 up;
-	float fov;
 	vec2 pixelLength; 
+	float fov;
+	float aspectRatio;
 } ubo;
 
 struct Triangle
 {
-	int id;
-	int materialId;
 	vec3 vert0;
+	int id;
 	vec3 vert1;
+	int materialId;
 	vec3 vert2;
-	vec3 norm0;
-	vec3 norm1;
-	vec3 norm2;
 };
 
 struct Ray
@@ -63,18 +58,9 @@ struct Ray
 	vec3 direction;
 };
 
-struct Plane
+layout (std140, binding = 2) buffer Triangles
 {
-	vec3 normal;
-	float distance;
-	vec3 diffuse;
-	float specular;
-	int id;
-};
-
-layout (std140, binding = 2) buffer Planes
-{
-	Plane planes[ ];
+	Triangle triangles[ ];
 };
 
 void reflectRay(inout vec3 rayD, in vec3 normal)
@@ -143,9 +129,6 @@ float triangleIntersect(
 	// Compute t
 	t = dot(edge2, qvec) * inv_det;
 
-	// Interpolate the normal
-	vec3 objspaceNormal = normalize(tri.norm0 * (1 - u - v) + tri.norm1 * u + tri.norm2 * v);
-
 	return t;
 }
 
@@ -156,21 +139,15 @@ int intersect(in Ray ray, inout float resT)
 {
 	int id = -1;
 
-	Triangle tri;
-	tri.id = 0;
-	tri.materialId = 0;
-	tri.vert0 = vec3(1.0, 0.0, 0.0);
-	tri.vert1 = vec3(0.0, 1.0, 0.0);
-	tri.vert2 = vec3(-1.0, 0.0, 0.0);
-	tri.norm0 = vec3(0, 0, 1);
-	tri.norm1 = vec3(0, 0, 1);
-	tri.norm2 = vec3(0, 0, 1);
+	for (int i = 0; i < triangles.length(); ++i) {
+		Triangle tri = triangles[i];
 
-	float tTri = triangleIntersect(tri, ray);
-	if ((tTri > EPSILON) && (tTri < resT))
-	{
-		id = tri.id;
-		resT = tTri;
+		float tTri = triangleIntersect(tri, ray);
+		if ((tTri > EPSILON) && (tTri < resT))
+		{
+			id = tri.id;
+			resT = tTri;
+		}
 	}
 	
 	return id;
@@ -227,21 +204,20 @@ void castRayFromCamera(in int width, in int height, inout Ray ray)
 void main()
 {
 
+	ivec2 dim = imageSize(resultImage);
+	vec2 uv = vec2(gl_GlobalInvocationID.xy) / dim;
+
 	camera.position = ubo.position;
-	camera.right = vec3(1.0, 0.0, 0.0);
-	camera.up = vec3(0.0, 1.0, 0.0);
-	camera.aspectRatio = 800.0/600.0;
+	camera.right = vec3(1,0,0);
+	camera.up = vec3(0,1,0);
+	camera.aspectRatio = dim.x / dim.y;
 	camera.lookat = vec3(0, 0, 0);
 	camera.forward = normalize(camera.lookat - camera.position);
 	camera.fov = 10.0;
 	camera.pixelLength = vec2(0.00058, 0.00058);
 
-	ivec2 dim = imageSize(resultImage);
-	vec2 uv = vec2(gl_GlobalInvocationID.xy) / dim;
 
 	Ray ray;
-	ray.origin = camera.position;
-	ray.direction = normalize(vec3((-1.0 + 2.0 * uv) * vec2(ubo.aspectRatio, 1.0), -1.0));
 	castRayFromCamera(dim.x, dim.y, ray);		
 
 	// Basic color path

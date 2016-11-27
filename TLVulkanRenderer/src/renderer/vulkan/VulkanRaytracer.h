@@ -56,6 +56,9 @@ protected:
 	PrepareCompute() final;
 
 	void
+	PrepareComputeDescriptors();
+
+	void
 	PrepareComputeCommandPool();
 
 	void
@@ -106,8 +109,7 @@ protected:
 
 			// -- Shapes buffers
 			VulkanBuffer::StorageBuffer triangles;
-			VulkanBuffer::StorageBuffer planes;
-			VkDeviceMemory planesMemory;
+			VkDeviceMemory trianglesMemory;
 		} buffers;
 
 		// -- Output storage image
@@ -118,12 +120,12 @@ protected:
 			glm::vec3 lightPos = glm::vec3(1.0f, 2.0f, -1.0f);
 			glm::vec3 position = glm::vec3(0.0f, 0.0f, -10.0f);
 			glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);;
-			float aspectRatio = 45.0f;
 			glm::vec3 lookat = glm::vec3(0.0f);
 			glm::vec3 forward;
 			glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-			float fov = 10.0f;
 			glm::vec2 pixelLength;
+			float fov = 10.0f;
+			float aspectRatio = 45.0f;
 		} ubo;
 	} m_compute;
 };

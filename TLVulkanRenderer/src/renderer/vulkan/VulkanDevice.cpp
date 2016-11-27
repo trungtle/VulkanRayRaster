@@ -722,6 +722,21 @@ VulkanDevice::CreateMemory(
 	}
 }
 
+void 
+VulkanDevice::CreateBufferAndMemory(
+	const VkDeviceSize size, 
+	const VkBufferUsageFlags usage, 
+	const VkMemoryPropertyFlags memoryProperties, 
+	VkBuffer& buffer, 
+	VkDeviceMemory& memory
+	) const
+{
+	CreateBuffer(size, usage, buffer);
+	CreateMemory(memoryProperties, buffer, memory);
+	VkDeviceSize memoryOffset = 0;
+	vkBindBufferMemory(device, buffer, memory, memoryOffset);
+}
+
 void
 VulkanDevice::CopyBuffer(
 	VkQueue queue,

@@ -87,8 +87,9 @@ VulkanRaytracer::~VulkanRaytracer()
 	
 	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.uniform.buffer, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.uniformMemory, nullptr);
-	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.planes.buffer, nullptr);
-	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.planesMemory, nullptr);
+
+	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.triangles.buffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.trianglesMemory, nullptr);
 
 }
 
@@ -589,33 +590,113 @@ VulkanRaytracer::PrepareCompute()
 {
 	vkGetDeviceQueue(m_vulkanDevice->device, m_vulkanDevice->queueFamilyIndices.computeFamily, 0, &m_compute.queue);
 
-	// Initialize camera's ubo
-	//calculate fov based on resolution
-	float yscaled = tan(m_compute.ubo.fov * (pi<float>() / 180.0f));
-	float xscaled = (yscaled * m_vulkanDevice->m_swapchain.aspectRatio);
-
-	m_compute.ubo.forward = glm::normalize(m_compute.ubo.lookat - m_compute.ubo.position);
-	m_compute.ubo.pixelLength = glm::vec2(2 * xscaled / (float)m_vulkanDevice->m_swapchain.extent.width
-		, 2 * yscaled / (float)m_vulkanDevice->m_swapchain.extent.height);
-
-	m_compute.ubo.aspectRatio = (float)m_vulkanDevice->m_swapchain.aspectRatio;
-
-	glm::vec3 c = glm::cross(glm::vec3(-1, 0, -10), glm::vec3(2, 0, 0));
-	float d = glm::dot(c, glm::vec3(1, -1, 0));
-
-	//camera.type = Camera::CameraType::lookat;
-	//camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
-	//camera.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
-	//camera.setTranslation(glm::vec3(0.0f, 0.0f, -4.0f));
-	//camera.rotationSpeed = 0.0f;
-	//camera.movementSpeed = 2.5f;
-
 	PrepareComputeCommandPool();
 	PrepareRayTraceTextureResources();
 	PrepareComputeStorageBuffer();
 	PrepareComputeUniformBuffer();
+	PrepareComputeDescriptors();
 	PrepareComputePipeline();
 	PrepareComputeCommandBuffers();
+}
+
+void
+VulkanRaytracer::PrepareComputeDescriptors()
+{
+	// 2. Create descriptor set layout
+
+	std::vector<VkDescriptorPoolSize> poolSizes = {
+		// Output storage image of ray traced result
+		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1),
+		// Uniform buffer for compute
+		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
+		// Mesh storage buffers
+		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
+	};
+
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = MakeDescriptorPoolCreateInfo(
+		poolSizes.size(),
+		poolSizes.data(),
+		3
+	);
+
+	CheckVulkanResult(
+		vkCreateDescriptorPool(m_vulkanDevice->device, &descriptorPoolCreateInfo, nullptr, &m_compute.descriptorPool),
+		"Failed to create descriptor pool"
+	);
+
+	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+		// Binding 0: output storage image
+		MakeDescriptorSetLayoutBinding(
+			0,
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			VK_SHADER_STAGE_COMPUTE_BIT
+		),
+		// Binding 1: uniform buffer for compute
+		MakeDescriptorSetLayoutBinding(
+			1,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			VK_SHADER_STAGE_COMPUTE_BIT
+		),
+		// Binding 2: uniform buffer for triangles
+		MakeDescriptorSetLayoutBinding(
+			2,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_SHADER_STAGE_COMPUTE_BIT
+		),
+	};
+
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo =
+		MakeDescriptorSetLayoutCreateInfo(
+			setLayoutBindings.data(),
+			setLayoutBindings.size()
+		);
+
+	CheckVulkanResult(
+		vkCreateDescriptorSetLayout(m_vulkanDevice->device, &descriptorSetLayoutCreateInfo, nullptr, &m_compute.descriptorSetLayout),
+		"Failed to create descriptor set layout"
+	);
+
+	// 3. Allocate descriptor set
+
+	VkDescriptorSetAllocateInfo descriptorSetAllocInfo = MakeDescriptorSetAllocateInfo(m_compute.descriptorPool, &m_compute.descriptorSetLayout);
+
+	CheckVulkanResult(
+		vkAllocateDescriptorSets(m_vulkanDevice->device, &descriptorSetAllocInfo, &m_compute.descriptorSets),
+		"failed to allocate descriptor set"
+	);
+
+	// 4. Update descriptor sets
+
+	std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+		// Binding 0, output storage image
+		MakeWriteDescriptorSet(
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			m_compute.descriptorSets,
+			0, // Binding 0
+			1,
+			nullptr,
+			&m_compute.storageRaytraceImage.descriptor
+		),
+		MakeWriteDescriptorSet(
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			m_compute.descriptorSets,
+			1, // Binding 1
+			1,
+			&m_compute.buffers.uniform.descriptor,
+			nullptr
+		),
+		MakeWriteDescriptorSet(
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			m_compute.descriptorSets,
+			2, // Binding 2
+			1,
+			&m_compute.buffers.triangles.descriptor,
+			nullptr
+		),
+	};
+
+	vkUpdateDescriptorSets(m_vulkanDevice->device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, NULL);
+
 }
 
 void 
@@ -642,31 +723,36 @@ struct Plane
 
 uint32_t currentId = 0;	// Id used to identify objects by the ray tracing shader
 
-Plane newPlane(glm::vec3 normal, float distance, glm::vec3 diffuse, float specular)
+Triangle newTriangle(
+	glm::vec3 vert0,
+	glm::vec3 vert1,
+	glm::vec3 vert2,
+	glm::vec3 normal
+	)
 {
-	Plane plane;
-	plane.id = currentId++;
-	plane.normal = normal;
-	plane.distance = distance;
-	plane.diffuse = diffuse;
-	plane.specular = specular;
-	return plane;
+	Triangle triangle;
+	triangle.id = 0;
+	triangle.materialid = 0;
+	triangle.vert0 = vert0;
+	triangle.vert1 = vert1;
+	triangle.vert2 = vert2;
+	return triangle;
 }
 
 void 
 VulkanRaytracer::PrepareComputeStorageBuffer() 
 {
-	// Planes
-	std::vector<Plane> planes;
-	const float roomDim = 4.0f;
-	planes.push_back(newPlane(glm::vec3(0.0f, 1.0f, 0.0f), roomDim, glm::vec3(1.0f), 32.0f));
-	planes.push_back(newPlane(glm::vec3(0.0f, -1.0f, 0.0f), roomDim, glm::vec3(1.0f), 32.0f));
-	planes.push_back(newPlane(glm::vec3(0.0f, 0.0f, 1.0f), roomDim, glm::vec3(1.0f), 32.0f));
-	planes.push_back(newPlane(glm::vec3(0.0f, 0.0f, -1.0f), roomDim, glm::vec3(0.0f), 32.0f));
-	planes.push_back(newPlane(glm::vec3(-1.0f, 0.0f, 0.0f), roomDim, glm::vec3(1.0f, 0.0f, 0.0f), 32.0f));
-	planes.push_back(newPlane(glm::vec3(1.0f, 0.0f, 0.0f), roomDim, glm::vec3(0.0f, 1.0f, 0.0f), 32.0f));
-	VkDeviceSize storageBufferSize = planes.size() * sizeof(Plane);
-
+	// Triangles
+	std::vector<Triangle> tris;
+	tris.push_back(
+		newTriangle(glm::vec3(-1,0,0), glm::vec3(0,1,0), glm::vec3(1,0,0), 
+			glm::vec3(0,0,1))
+		);
+	tris.push_back(
+		newTriangle(glm::vec3(-1, 0, 0), glm::vec3(0, -1, 0), glm::vec3(1, 0, 0),
+			glm::vec3(0, 0, 1))
+	);
+	VkDeviceSize storageBufferSize = tris.size() * sizeof(Triangle);
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingMemory;
 
@@ -683,49 +769,55 @@ VulkanRaytracer::PrepareComputeStorageBuffer()
 		stagingMemory
 	);
 
-	VkDeviceSize memoryOffset = 0;
-	vkBindBufferMemory(m_vulkanDevice->device, stagingBuffer, stagingMemory, memoryOffset);
+	int s = sizeof(Plane);
+
+	vkBindBufferMemory(m_vulkanDevice->device, stagingBuffer, stagingMemory, 0);
 
 	void* data;
 	vkMapMemory(m_vulkanDevice->device, stagingMemory, 0, storageBufferSize, 0, &data);
-	memcpy(data, planes.data(), static_cast<size_t>(storageBufferSize));
+	memcpy(data, tris.data(), static_cast<size_t>(storageBufferSize));
 	vkUnmapMemory(m_vulkanDevice->device, stagingMemory);
 
 	// -----------------------------------------
 
-	m_vulkanDevice->CreateBuffer(
+	m_vulkanDevice->CreateBufferAndMemory(
 		storageBufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		m_compute.buffers.planes.buffer
-	);
-
-	m_vulkanDevice->CreateMemory(
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_compute.buffers.planes.buffer,
-		m_compute.buffers.planesMemory
+		m_compute.buffers.triangles.buffer,
+		m_compute.buffers.trianglesMemory
 	);
-
-	// Bind buffer with memory
-	vkBindBufferMemory(m_vulkanDevice->device, m_compute.buffers.planes.buffer, m_compute.buffers.planesMemory, memoryOffset);
 
 	// Copy over to vertex buffer in device local memory
 	m_vulkanDevice->CopyBuffer(
 		m_compute.queue,
 		m_compute.commandPool,
-		m_compute.buffers.planes.buffer,
+		m_compute.buffers.triangles.buffer,
 		stagingBuffer,
 		storageBufferSize
 	);
 
-	m_compute.buffers.planes.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.planes.buffer, 0, storageBufferSize);
+	m_compute.buffers.triangles.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.triangles.buffer, 0, storageBufferSize);
 
 	// Cleanup staging buffer memory
 	vkDestroyBuffer(m_vulkanDevice->device, stagingBuffer, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, stagingMemory, nullptr);
+
 }
 
 void VulkanRaytracer::PrepareComputeUniformBuffer() 
 {
+	// Initialize camera's ubo
+	//calculate fov based on resolution
+	float yscaled = tan(m_compute.ubo.fov * (pi<float>() / 180.0f));
+	float xscaled = (yscaled * m_vulkanDevice->m_swapchain.aspectRatio);
+
+	m_compute.ubo.forward = glm::normalize(m_compute.ubo.lookat - m_compute.ubo.position);
+	m_compute.ubo.pixelLength = glm::vec2(2 * xscaled / (float)m_vulkanDevice->m_swapchain.extent.width
+		, 2 * yscaled / (float)m_vulkanDevice->m_swapchain.extent.height);
+
+	m_compute.ubo.aspectRatio = (float)m_vulkanDevice->m_swapchain.aspectRatio;
+
 
 	VkDeviceSize bufferSize = sizeof(m_compute.ubo);
 
@@ -838,104 +930,6 @@ VulkanRaytracer::PrepareRayTraceTextureResources()
 VkResult
 VulkanRaytracer::PrepareComputePipeline()
 {
-	// 1. Get compute queue
-
-	vkGetDeviceQueue(m_vulkanDevice->device, m_vulkanDevice->queueFamilyIndices.computeFamily, 0, &m_compute.queue);
-
-	// 2. Create descriptor set layout
-
-	std::vector<VkDescriptorPoolSize> poolSizes = {
-		// Output storage image of ray traced result
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1),
-		// Uniform buffer for compute
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-		// Mesh storage buffers
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
-	};
-
-	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = MakeDescriptorPoolCreateInfo(
-		poolSizes.size(),
-		poolSizes.data(),
-		3
-	);
-
-	CheckVulkanResult(
-		vkCreateDescriptorPool(m_vulkanDevice->device, &descriptorPoolCreateInfo, nullptr, &m_compute.descriptorPool),
-		"Failed to create descriptor pool"
-	);
-
-	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-		// Binding 0: output storage image
-		MakeDescriptorSetLayoutBinding(
-			0,
-			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-			VK_SHADER_STAGE_COMPUTE_BIT
-		),
-		// Binding 1: uniform buffer for compute
-		MakeDescriptorSetLayoutBinding(
-			1,
-			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			VK_SHADER_STAGE_COMPUTE_BIT
-		),
-		// Binding 2: uniform buffer for triangles
-		MakeDescriptorSetLayoutBinding(
-			2,
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-			VK_SHADER_STAGE_COMPUTE_BIT
-		)
-	};
-
-	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo =
-		MakeDescriptorSetLayoutCreateInfo(
-			setLayoutBindings.data(),
-			setLayoutBindings.size()
-		);
-
-	CheckVulkanResult(
-		vkCreateDescriptorSetLayout(m_vulkanDevice->device, &descriptorSetLayoutCreateInfo, nullptr, &m_compute.descriptorSetLayout),
-		"Failed to create descriptor set layout"
-	);
-
-	// 3. Allocate descriptor set
-
-	VkDescriptorSetAllocateInfo descriptorSetAllocInfo = MakeDescriptorSetAllocateInfo(m_compute.descriptorPool, &m_compute.descriptorSetLayout);
-
-	CheckVulkanResult(
-		vkAllocateDescriptorSets(m_vulkanDevice->device, &descriptorSetAllocInfo, &m_compute.descriptorSets),
-		"failed to allocate descriptor set"
-	);
-
-	// 4. Update descriptor sets
-
-	std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-		// Binding 0, output storage image
-		MakeWriteDescriptorSet(
-			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-			m_compute.descriptorSets,
-			0, // Binding 0
-			1,
-			nullptr,
-			&m_compute.storageRaytraceImage.descriptor
-		),
-		MakeWriteDescriptorSet(
-			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			m_compute.descriptorSets,
-			1, // Binding 1
-			1,
-			&m_compute.buffers.uniform.descriptor,
-			nullptr
-		),
-		MakeWriteDescriptorSet(
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-			m_compute.descriptorSets,
-			2, // Binding 2
-			1,
-			&m_compute.buffers.planes.descriptor,
-			nullptr
-		)
-	};
-
-	vkUpdateDescriptorSets(m_vulkanDevice->device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, NULL);
 
 	// 5. Create pipeline layout
 
