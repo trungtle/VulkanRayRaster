@@ -116,6 +116,7 @@ Swapchain::SelectDesiredSwapchainExtent(
 	if (surfaceCapabilities.currentExtent.width != 0xFFFFFFFF ||
 		surfaceCapabilities.currentExtent.height != 0xFFFFFFFF)
 	{
+		
 		return surfaceCapabilities.currentExtent;
 	}
 

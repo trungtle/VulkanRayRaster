@@ -35,6 +35,11 @@ struct Swapchain
 	VkExtent2D extent;
 
 	/**
+	 * \brief extent's width / height
+	 */
+	float aspectRatio;
+
+	/**
 	* \brief This is a view into the Vulkan
 	* \ref https://www.khronos.org/registry/vulkan/specs/1.0/xhtml/vkspec.html#resources-image-views
 	*/

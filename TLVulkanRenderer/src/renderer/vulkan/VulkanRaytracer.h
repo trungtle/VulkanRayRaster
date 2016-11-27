@@ -116,15 +116,17 @@ protected:
 		struct UBOCompute
 		{							// Compute shader uniform block object
 			glm::vec3 lightPos;
-			float aspectRatio;						// Aspect ratio of the viewport
 			struct
 			{
-				glm::vec3 pos = glm::vec3(0.0f, 0.0f, 4.0f);
-				glm::vec3 lookat = glm::vec3(0.0f, 0.5f, 0.0f);
+				float aspectRatio;
+				glm::vec3 position = glm::vec3(0.0f, 0.0f, 10.0f);
+				glm::vec3 lookat = glm::vec3(0.0f, 0.0f, 0.0f);
+				glm::vec3 forward;
+				glm::vec3 right;
+				glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f);
 				float fov = 10.0f;
+				glm::vec2 pixelLength;
 			} camera;
 		} ubo;
 	} m_compute;
-
-
 };

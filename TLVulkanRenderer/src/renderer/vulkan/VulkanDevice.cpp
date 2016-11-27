@@ -174,12 +174,12 @@ VulkanDevice::SetupLogicalDevice()
 	// Create a set of unique queue families for the required queues
 	queueFamilyIndices = FindQueueFamilyIndices(physicalDevice, surfaceKHR);
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-	std::set<int> uniqueQueueFamilies = { queueFamilyIndices.graphicsFamily, queueFamilyIndices.presentFamily };
-	for (auto i : uniqueQueueFamilies)
+	std::set<int> uniqueQueueFamilies = { queueFamilyIndices.graphicsFamily, queueFamilyIndices.presentFamily, queueFamilyIndices.computeFamily };
+	for (auto familyIndex : uniqueQueueFamilies)
 	{
 		VkDeviceQueueCreateInfo queueCreateInfo = {};
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCreateInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+		queueCreateInfo.queueFamilyIndex = familyIndex;
 		queueCreateInfo.queueCount = 1; // Only using one queue for now. We actually don't need that many.
 		float queuePriority = 1.0f; // Queue priority. Required even if we only have one queue.
 		queueCreateInfo.pQueuePriorities = &queuePriority;
@@ -317,6 +317,7 @@ VulkanDevice::PrepareSwapchain()
 	// Initialize other swapchain related fields
 	m_swapchain.imageFormat = surfaceFormat.format;
 	m_swapchain.extent = extent;
+	m_swapchain.aspectRatio = (float) extent.width /(float) extent.height;
 
 	return result;
 }

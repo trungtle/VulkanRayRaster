@@ -1,5 +1,6 @@
 #include "VulkanRaytracer.h"
 #include "Utilities.h"
+#include <glm/gtc/constants.inl>
 
 VulkanRaytracer::VulkanRaytracer(
 	GLFWwindow* window, 
@@ -78,6 +79,8 @@ VulkanRaytracer::~VulkanRaytracer()
 	vkDestroyDescriptorSetLayout(m_vulkanDevice->device, m_compute.descriptorSetLayout, nullptr);
 	vkDestroyDescriptorPool(m_vulkanDevice->device, m_compute.descriptorPool, nullptr);
 
+	vkDestroyFence(m_vulkanDevice->device, m_compute.fence, nullptr);
+
 	vkDestroyImageView(m_vulkanDevice->device, m_compute.storageRaytraceImage.imageView, nullptr);
 	vkDestroyImage(m_vulkanDevice->device, m_compute.storageRaytraceImage.image, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, m_compute.storageRaytraceImage.imageMemory, nullptr);
@@ -86,6 +89,7 @@ VulkanRaytracer::~VulkanRaytracer()
 	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.uniformMemory, nullptr);
 	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.planes.buffer, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.planesMemory, nullptr);
+
 }
 
 void VulkanRaytracer::PrepareGraphics() 
@@ -112,14 +116,14 @@ VulkanRaytracer::PrepareGraphicsVertexBuffer()
 		{ -1.0, -1.0 },
 		{ 1.0, -1.0 },
 		{ 1.0,  1.0 },
-		{ -1.0,  1.0 },
+		{-1.0,  1.0 },
 	};
 
 	const std::vector<vec2> uvs = {
-		{ -1.0, -1.0 },
-		{ 1.0, -1.0 },
+		{ 0.0, 0.0 },
+		{ 1.0, 0.0 },
 		{ 1.0,  1.0 },
-		{ -1.0,  1.0 },
+		{ 0.0,  1.0 },
 	};
 
 	m_quad.indices = indices;
@@ -215,8 +219,7 @@ VulkanRaytracer::PrepareGraphicsDescriptorPool()
 {
 	std::vector<VkDescriptorPoolSize> poolSizes = {
 		// Image sampler
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1),
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
+		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 	};
 
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = MakeDescriptorPoolCreateInfo(
@@ -398,7 +401,17 @@ VulkanRaytracer::PrepareGraphicsPipeline()
 
 	VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = MakePipelineColorBlendStateCreateInfo(colorBlendAttachments);
 
-	// 8. Dynamic state. Some pipeline states can be updated dynamically. Skip for now.
+	// 8. Dynamic state. Some pipeline states can be updated dynamically. 
+
+
+	std::vector<VkDynamicState> dynamicStateEnables = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+	VkPipelineDynamicStateCreateInfo dynamicState = {};
+	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicState.dynamicStateCount = dynamicStateEnables.size();
+	dynamicState.pDynamicStates = dynamicStateEnables.data();
 
 	// 9. Create pipeline layout to hold uniforms. This can be modified dynamically. 
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = MakePipelineLayoutCreateInfo(&m_graphics.descriptorSetLayout);
@@ -486,6 +499,24 @@ VulkanRaytracer::PrepareGraphicsCommandBuffers()
 
 		vkBeginCommandBuffer(m_graphics.commandBuffers[i], &beginInfo);
 
+		// Image memory barrier to make sure that compute shader writes are finished before sampling from the texture
+		VkImageMemoryBarrier imageMemoryBarrier = {};
+		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageMemoryBarrier.image = m_compute.storageRaytraceImage.image;
+		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		vkCmdPipelineBarrier(
+			m_graphics.commandBuffers[i],
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &imageMemoryBarrier);
+
 		// Begin renderpass
 		std::vector<VkClearValue> clearValues(2);
 		glm::vec4 clearColor = NormalizeColor(0, 67, 100, 255);
@@ -504,6 +535,14 @@ VulkanRaytracer::PrepareGraphicsCommandBuffers()
 
 		// Record binding the graphics pipeline
 		vkCmdBindPipeline(m_graphics.commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphics.m_graphicsPipeline);
+
+		VkViewport viewport = MakeFullscreenViewport(m_vulkanDevice->m_swapchain.extent);
+		vkCmdSetViewport(m_graphics.commandBuffers[i], 0, 1, &viewport);
+
+		VkRect2D scissor = {};
+		scissor.offset = { 0, 0 };
+		scissor.extent = m_vulkanDevice->m_swapchain.extent;
+		vkCmdSetScissor(m_graphics.commandBuffers[i], 0, 1, &scissor);
 
 		for (int b = 0; b <m_graphics.geometryBuffers.size(); ++b)
 		{
@@ -550,11 +589,34 @@ VulkanRaytracer::PrepareCompute()
 {
 	vkGetDeviceQueue(m_vulkanDevice->device, m_vulkanDevice->queueFamilyIndices.computeFamily, 0, &m_compute.queue);
 
+	// Initialize camera's ubo
+	//calculate fov based on resolution
+	float yscaled = tan(m_compute.ubo.camera.fov * (pi<float>() / 180.0f));
+	float xscaled = (yscaled * m_vulkanDevice->m_swapchain.aspectRatio);
+
+	m_compute.ubo.camera.forward = glm::normalize(m_compute.ubo.camera.lookat - m_compute.ubo.camera.position);
+	m_compute.ubo.camera.right = glm::normalize(glm::cross(m_compute.ubo.camera.forward, m_compute.ubo.camera.up));
+	m_compute.ubo.camera.pixelLength = glm::vec2(2 * xscaled / (float)m_vulkanDevice->m_swapchain.extent.width
+		, 2 * yscaled / (float)m_vulkanDevice->m_swapchain.extent.height);
+
+	m_compute.ubo.camera.aspectRatio = (float)m_vulkanDevice->m_swapchain.aspectRatio;
+
+	glm::vec3 c = glm::cross(glm::vec3(-1, 0, -10), glm::vec3(2, 0, 0));
+	float d = glm::dot(c, glm::vec3(1, -1, 0));
+
+	//camera.type = Camera::CameraType::lookat;
+	//camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
+	//camera.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
+	//camera.setTranslation(glm::vec3(0.0f, 0.0f, -4.0f));
+	//camera.rotationSpeed = 0.0f;
+	//camera.movementSpeed = 2.5f;
+
 	PrepareComputeCommandPool();
 	PrepareRayTraceTextureResources();
 	PrepareComputeStorageBuffer();
 	PrepareComputeUniformBuffer();
 	PrepareComputePipeline();
+	PrepareComputeCommandBuffers();
 }
 
 void 
@@ -684,7 +746,6 @@ void VulkanRaytracer::PrepareComputeUniformBuffer()
 	m_compute.ubo.lightPos.x = 0.0f + sin(glm::radians(360.0f)) * cos(glm::radians(360.0f)) * 2.0f;
 	m_compute.ubo.lightPos.y = 0.0f + sin(glm::radians(360.0f)) * 2.0f;
 	m_compute.ubo.lightPos.z = 0.0f + cos(glm::radians(360.0f)) * 2.0f;
-	m_compute.ubo.camera.pos = glm::vec3() * -1.0f;
 
 	void* data;
 	vkMapMemory(m_vulkanDevice->device, m_compute.buffers.uniformMemory, 0, bufferSize, 0, &data);
@@ -733,6 +794,9 @@ VulkanRaytracer::PrepareRayTraceTextureResources()
 	// Create sampler
 	MakeDefaultTextureSampler(m_vulkanDevice->device, &m_compute.storageRaytraceImage.sampler);
 
+	m_compute.storageRaytraceImage.width = m_vulkanDevice->m_swapchain.extent.width;
+	m_compute.storageRaytraceImage.height = m_vulkanDevice->m_swapchain.extent.height;
+
 	// Initialize descriptor
 	m_compute.storageRaytraceImage.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	m_compute.storageRaytraceImage.descriptor.imageView = m_compute.storageRaytraceImage.imageView;
@@ -746,10 +810,6 @@ VulkanRaytracer::PrepareComputePipeline()
 {
 	// 1. Get compute queue
 
-	VkDeviceQueueCreateInfo queueCreateInfo = {};
-	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queueCreateInfo.queueCount = 1;
-	queueCreateInfo.queueFamilyIndex = m_vulkanDevice->queueFamilyIndices.computeFamily;
 	vkGetDeviceQueue(m_vulkanDevice->device, m_vulkanDevice->queueFamilyIndices.computeFamily, 0, &m_compute.queue);
 
 	// 2. Create descriptor set layout
@@ -881,10 +941,6 @@ VulkanRaytracer::PrepareComputePipeline()
 		vkCreateFence(m_vulkanDevice->device, &fenceCreateInfo, nullptr, &m_compute.fence),
 		"Failed to create fence"
 		);
-
-	// 8. Create compute command buffers
-
-	PrepareComputeCommandBuffers();
 
 	return VK_SUCCESS;
 }
