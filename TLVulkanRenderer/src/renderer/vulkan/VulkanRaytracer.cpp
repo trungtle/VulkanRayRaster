@@ -591,15 +591,14 @@ VulkanRaytracer::PrepareCompute()
 
 	// Initialize camera's ubo
 	//calculate fov based on resolution
-	float yscaled = tan(m_compute.ubo.camera.fov * (pi<float>() / 180.0f));
+	float yscaled = tan(m_compute.ubo.fov * (pi<float>() / 180.0f));
 	float xscaled = (yscaled * m_vulkanDevice->m_swapchain.aspectRatio);
 
-	m_compute.ubo.camera.forward = glm::normalize(m_compute.ubo.camera.lookat - m_compute.ubo.camera.position);
-	m_compute.ubo.camera.right = glm::normalize(glm::cross(m_compute.ubo.camera.forward, m_compute.ubo.camera.up));
-	m_compute.ubo.camera.pixelLength = glm::vec2(2 * xscaled / (float)m_vulkanDevice->m_swapchain.extent.width
+	m_compute.ubo.forward = glm::normalize(m_compute.ubo.lookat - m_compute.ubo.position);
+	m_compute.ubo.pixelLength = glm::vec2(2 * xscaled / (float)m_vulkanDevice->m_swapchain.extent.width
 		, 2 * yscaled / (float)m_vulkanDevice->m_swapchain.extent.height);
 
-	m_compute.ubo.camera.aspectRatio = (float)m_vulkanDevice->m_swapchain.aspectRatio;
+	m_compute.ubo.aspectRatio = (float)m_vulkanDevice->m_swapchain.aspectRatio;
 
 	glm::vec3 c = glm::cross(glm::vec3(-1, 0, -10), glm::vec3(2, 0, 0));
 	float d = glm::dot(c, glm::vec3(1, -1, 0));
@@ -727,15 +726,43 @@ VulkanRaytracer::PrepareComputeStorageBuffer()
 
 void VulkanRaytracer::PrepareComputeUniformBuffer() 
 {
+
 	VkDeviceSize bufferSize = sizeof(m_compute.ubo);
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+
+	// Stage
 	m_vulkanDevice->CreateBuffer(
 		bufferSize,
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		m_compute.buffers.uniform.buffer
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		stagingBuffer
 	);
 
 	m_vulkanDevice->CreateMemory(
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingMemory
+	);
+
+	VkDeviceSize memoryOffset = 0;
+	vkBindBufferMemory(m_vulkanDevice->device, stagingBuffer, stagingMemory, memoryOffset);
+
+	void* data;
+	vkMapMemory(m_vulkanDevice->device, stagingMemory, 0, bufferSize, 0, &data);
+	memcpy(data, &m_compute.ubo, bufferSize);
+	vkUnmapMemory(m_vulkanDevice->device, stagingMemory);
+
+	// -----------------------------------------
+
+	m_vulkanDevice->CreateBuffer(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		m_compute.buffers.uniform.buffer
+	);
+
+	m_vulkanDevice->CreateMemory(
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		m_compute.buffers.uniform.buffer,
 		m_compute.buffers.uniformMemory
 	);
@@ -743,16 +770,19 @@ void VulkanRaytracer::PrepareComputeUniformBuffer()
 	// Bind buffer with memory
 	vkBindBufferMemory(m_vulkanDevice->device, m_compute.buffers.uniform.buffer, m_compute.buffers.uniformMemory, 0);
 
-	m_compute.ubo.lightPos.x = 0.0f + sin(glm::radians(360.0f)) * cos(glm::radians(360.0f)) * 2.0f;
-	m_compute.ubo.lightPos.y = 0.0f + sin(glm::radians(360.0f)) * 2.0f;
-	m_compute.ubo.lightPos.z = 0.0f + cos(glm::radians(360.0f)) * 2.0f;
-
-	void* data;
-	vkMapMemory(m_vulkanDevice->device, m_compute.buffers.uniformMemory, 0, bufferSize, 0, &data);
-	memcpy(data, &m_compute.ubo, bufferSize);
-	vkUnmapMemory(m_vulkanDevice->device, m_compute.buffers.uniformMemory);
+	m_vulkanDevice->CopyBuffer(
+		m_compute.queue,
+		m_compute.commandPool,
+		m_compute.buffers.uniform.buffer,
+		stagingBuffer,
+		bufferSize
+	);
 
 	m_compute.buffers.uniform.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.uniform.buffer, 0, bufferSize);
+
+	// Cleanup staging buffer memory
+	vkDestroyBuffer(m_vulkanDevice->device, stagingBuffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, stagingMemory, nullptr);
 }
 
 VkResult
@@ -815,10 +845,10 @@ VulkanRaytracer::PrepareComputePipeline()
 	// 2. Create descriptor set layout
 
 	std::vector<VkDescriptorPoolSize> poolSizes = {
-		// Uniform buffer for compute
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		// Output storage image of ray traced result
 		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1),
+		// Uniform buffer for compute
+		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		// Mesh storage buffers
 		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
 	};
