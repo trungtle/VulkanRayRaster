@@ -33,16 +33,6 @@ struct MeshData
 	std::map<EVertexAttributeType, VertexAttributeInfo> vertexAttributes;
 };
 
-struct Triangle
-{
-	glm::vec3 vert0;
-	uint32_t id;
-	glm::vec3 vert1;
-	uint32_t materialid;
-	glm::vec3 vert2; 
-	uint32_t _pad;
-};
-
 // ---------
 // MATERIAL
 // ----------

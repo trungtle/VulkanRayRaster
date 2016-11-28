@@ -794,22 +794,6 @@ struct Plane
 
 uint32_t currentId = 0;	// Id used to identify objects by the ray tracing shader
 
-Triangle newTriangle(
-	glm::vec3 vert0,
-	glm::vec3 vert1,
-	glm::vec3 vert2,
-	glm::vec3 normal
-	)
-{
-	Triangle triangle;
-	triangle.id = 0;
-	triangle.materialid = 0;
-	triangle.vert0 = vert0;
-	triangle.vert1 = vert1;
-	triangle.vert2 = vert2;
-	return triangle;
-}
-
 void 
 VulkanRaytracer::PrepareComputeStorageBuffer() 
 {
