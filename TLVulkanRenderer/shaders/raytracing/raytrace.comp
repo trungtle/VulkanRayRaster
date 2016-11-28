@@ -12,7 +12,7 @@
 #define MAXLEN 1000.0
 #define TRACEDEPTH 1
 
-vec3 LIGHT_POS = vec3(0, 4, 0);
+vec3 LIGHT_POS = vec3(2, 4, 5);
 
 struct Camera
 {
@@ -388,7 +388,7 @@ float calcShadow(in Ray feeler, in int objectId, inout float t)
 		if ((tTri > EPSILON) && (abs(tTri) < t))
 		{
 			t = tTri;
-			return 0.1;
+			return 0.5;
 		}
 	}
 
