@@ -1,16 +1,17 @@
 #pragma once
 
-#include <glm/glm.hpp>
 #include <map>
 #include "tinygltfloader/tiny_gltf_loader.h"
 #include "SceneUtil.h"
 
+class Camera;
 class Scene
 {
 public:
 	Scene(std::string fileName);
 	~Scene();
 	
+	Camera* camera;
 	std::vector<MeshData*> meshesData;
 	std::vector<Material> materials;
 	std::vector<glm::ivec4> indices;

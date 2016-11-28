@@ -1,6 +1,6 @@
 #include "VulkanRaytracer.h"
 #include "Utilities.h"
-#include <glm/gtc/constants.inl>
+#include "Camera.h"
 
 VulkanRaytracer::VulkanRaytracer(
 	GLFWwindow* window, 
@@ -14,6 +14,26 @@ VulkanRaytracer::VulkanRaytracer(
 void 
 VulkanRaytracer::Update() 
 {
+	// Update camera ubo
+	m_compute.ubo.position = glm::vec4(m_scene->camera->position, 1.0f);
+	m_compute.ubo.forward = glm::vec4(m_scene->camera->forward, 0.0f);
+	m_compute.ubo.up = glm::vec4(m_scene->camera->up, 0.0f);
+	m_compute.ubo.right = glm::vec4(m_scene->camera->right, 0.0f);
+	m_compute.ubo.lookat = glm::vec4(m_scene->camera->lookAt, 0.0f);
+
+	m_vulkanDevice->MapMemory(
+		&m_compute.ubo,
+		m_compute.buffers.stagingUniform.memory,
+		sizeof(m_compute.ubo),
+		0
+	);
+
+	m_vulkanDevice->CopyBuffer(
+		m_compute.queue,
+		m_compute.commandPool,
+		m_compute.buffers.uniform.buffer,
+		m_compute.buffers.stagingUniform.buffer,
+		sizeof(m_compute.ubo));
 }
 
 void 
@@ -86,7 +106,13 @@ VulkanRaytracer::~VulkanRaytracer()
 	vkFreeMemory(m_vulkanDevice->device, m_compute.storageRaytraceImage.imageMemory, nullptr);
 	
 	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.uniform.buffer, nullptr);
-	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.uniformMemory, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.uniform.memory, nullptr);
+
+	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.stagingUniform.buffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.stagingUniform.memory, nullptr);
+
+	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.materials.buffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.materials.memory, nullptr);
 
 	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.indices.buffer, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.indices.memory, nullptr);
@@ -611,7 +637,7 @@ VulkanRaytracer::PrepareComputeDescriptors()
 		// Output storage image of ray traced result
 		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1),
 		// Uniform buffer for compute
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
+		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2),
 		// Mesh storage buffers
 		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3)
 	};
@@ -652,10 +678,16 @@ VulkanRaytracer::PrepareComputeDescriptors()
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			VK_SHADER_STAGE_COMPUTE_BIT
 		),
-		// Binding 3: storage buffer for triangle normals
+		// Binding 4: storage buffer for triangle normals
 		MakeDescriptorSetLayoutBinding(
 			4,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_SHADER_STAGE_COMPUTE_BIT
+		),
+		// Binding 5: uniform buffer for materials
+		MakeDescriptorSetLayoutBinding(
+			5,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			VK_SHADER_STAGE_COMPUTE_BIT
 		),
 	};
@@ -722,6 +754,14 @@ VulkanRaytracer::PrepareComputeDescriptors()
 			4, // Binding 4
 			1,
 			&m_compute.buffers.verticeNormals.descriptor,
+			nullptr
+		),
+		MakeWriteDescriptorSet(
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			m_compute.descriptorSets,
+			5, // Binding 5
+			1,
+			&m_compute.buffers.materials.descriptor,
 			nullptr
 		),
 	};
@@ -922,7 +962,7 @@ void VulkanRaytracer::PrepareComputeUniformBuffer()
 {
 	// Initialize camera's ubo
 	//calculate fov based on resolution
-	float yscaled = tan(m_compute.ubo.fov * (pi<float>() / 180.0f));
+	float yscaled = tan(m_compute.ubo.fov * (glm::pi<float>() / 180.0f));
 	float xscaled = (yscaled * m_vulkanDevice->m_swapchain.aspectRatio);
 
 	m_compute.ubo.forward = glm::normalize(m_compute.ubo.lookat - m_compute.ubo.position);
@@ -934,60 +974,88 @@ void VulkanRaytracer::PrepareComputeUniformBuffer()
 
 	VkDeviceSize bufferSize = sizeof(m_compute.ubo);
 
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingMemory;
-
 	// Stage
-	m_vulkanDevice->CreateBuffer(
+	m_vulkanDevice->CreateBufferAndMemory(
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		stagingBuffer
-	);
-
-	m_vulkanDevice->CreateMemory(
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		stagingBuffer,
-		stagingMemory
+		m_compute.buffers.stagingUniform.buffer,
+		m_compute.buffers.stagingUniform.memory
 	);
 
-	VkDeviceSize memoryOffset = 0;
-	vkBindBufferMemory(m_vulkanDevice->device, stagingBuffer, stagingMemory, memoryOffset);
-
-	void* data;
-	vkMapMemory(m_vulkanDevice->device, stagingMemory, 0, bufferSize, 0, &data);
-	memcpy(data, &m_compute.ubo, bufferSize);
-	vkUnmapMemory(m_vulkanDevice->device, stagingMemory);
+	m_vulkanDevice->MapMemory(
+		&m_compute.ubo,
+		m_compute.buffers.stagingUniform.memory,
+		bufferSize,
+		0
+	);
 
 	// -----------------------------------------
 
-	m_vulkanDevice->CreateBuffer(
+	m_vulkanDevice->CreateBufferAndMemory(
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		m_compute.buffers.uniform.buffer
-	);
-
-	m_vulkanDevice->CreateMemory(
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		m_compute.buffers.uniform.buffer,
-		m_compute.buffers.uniformMemory
+		m_compute.buffers.uniform.memory
 	);
-
-	// Bind buffer with memory
-	vkBindBufferMemory(m_vulkanDevice->device, m_compute.buffers.uniform.buffer, m_compute.buffers.uniformMemory, 0);
 
 	m_vulkanDevice->CopyBuffer(
 		m_compute.queue,
 		m_compute.commandPool,
 		m_compute.buffers.uniform.buffer,
-		stagingBuffer,
+		m_compute.buffers.stagingUniform.buffer,
 		bufferSize
 	);
 
 	m_compute.buffers.uniform.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.uniform.buffer, 0, bufferSize);
 
+	// ====== MATERIALS
+	bufferSize = sizeof(Material) * m_scene->materials.size();
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+
+
+	// Stage
+	m_vulkanDevice->CreateBufferAndMemory(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingMemory
+	);
+
+	m_vulkanDevice->MapMemory(
+		m_scene->materials.data(),
+		stagingMemory,
+		bufferSize,
+		0
+	);
+
+	// -----------------------------------------
+
+	m_vulkanDevice->CreateBufferAndMemory(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_compute.buffers.materials.buffer,
+		m_compute.buffers.materials.memory
+	);
+
+	m_vulkanDevice->CopyBuffer(
+		m_compute.queue,
+		m_compute.commandPool,
+		m_compute.buffers.materials.buffer,
+		stagingBuffer,
+		bufferSize
+	);
+
+	m_compute.buffers.materials.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.materials.buffer, 0, bufferSize);
+
 	// Cleanup staging buffer memory
 	vkDestroyBuffer(m_vulkanDevice->device, stagingBuffer, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, stagingMemory, nullptr);
+
 }
 
 VkResult

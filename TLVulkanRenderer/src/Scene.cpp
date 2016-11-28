@@ -987,6 +987,7 @@ Scene::Scene(
 		const glm::mat4 & matrix = nodeString.second;
 		const glm::mat3 & matrixNormal = glm::transpose(glm::inverse(glm::mat3(matrix)));
 
+		int materialId = 0;
 		for (auto& meshName : node.meshes)
 		{
 			auto& mesh = scene.meshes.at(meshName);
@@ -1030,7 +1031,7 @@ Scene::Scene(
 					uint16_t* in = reinterpret_cast<uint16_t*>(data.data());
 					for (auto iCount = 0; iCount < indicesCount; iCount += 3)
 					{
-						indices.push_back(glm::ivec4(in[iCount], in[iCount + 1], in[iCount + 2], 0));
+						indices.push_back(glm::ivec4(in[iCount], in[iCount + 1], in[iCount + 2], materialId));
 					}
 				}
 
@@ -1164,8 +1165,12 @@ Scene::Scene(
 							material.transparency = 1.0f;
 						}
 
+						// Hack for light material
+						if (materialId == 9 || materialId == 8) {
+							material.shininess = 1;
+						}
 						materials.push_back(material);
-						//++materialId;
+						++materialId;
 					}
 				}
 

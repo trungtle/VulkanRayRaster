@@ -1,5 +1,6 @@
 #pragma once
 #include "Typedef.h"
+#include <glm/glm.hpp>
 
 // ---------
 // VERTEX
@@ -54,6 +55,7 @@ typedef struct MaterialTyp
 	glm::vec4 specular;
 	float shininess;
 	float transparency;
+	glm::ivec2 _pad;
 } Material;
 
 

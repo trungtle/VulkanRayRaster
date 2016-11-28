@@ -16,17 +16,27 @@ vec3 LIGHT_POS = vec3(0, 4, 0);
 
 struct Camera
 {
-	vec3 position;   
-	vec3 right;
-	float aspectRatio;
-	vec3 lookat;
-	vec3 forward;
-	vec3 up;
-	float fov;
+	vec4 position;   
+	vec4 right;
+	vec4 lookat;
+	vec4 forward;
+	vec4 up;
 	vec2 pixelLength; 
+	float fov;
+	float aspectRatio;
 };
 
 Camera camera;
+
+struct Material
+{
+	vec4 diffuse;
+	vec4 ambient;
+	vec4 emission;
+	vec4 specular;
+	float shininess;
+	float transparency;
+};
 
 struct Triangle
 {
@@ -75,12 +85,11 @@ layout (binding = 0, rgba8) uniform writeonly image2D resultImage;
 
 layout (binding = 1) uniform UBO 
 {
-	vec3 lightPos;
-	vec3 position;   
-	vec3 right;
-	vec3 lookat;
-	vec3 forward;
-	vec3 up;
+	vec4 position;   
+	vec4 right;
+	vec4 lookat;
+	vec4 forward;
+	vec4 up;
 	vec2 pixelLength; 
 	float fov;
 	float aspectRatio;
@@ -102,6 +111,12 @@ layout (std140, binding = 4) buffer TriangleNormals
 	vec4 normals[ ];
 };
 
+
+layout (std140, binding = 5) uniform Materials
+{
+	Material materials[100];
+};
+
 void reflectRay(inout vec3 rayD, in vec3 normal)
 {
 	rayD = rayD + 2.0 * -dot(normal, rayD) * normal;
@@ -116,7 +131,7 @@ float lightDiffuse(vec3 normal, vec3 lightDir)
 
 float lightSpecular(vec3 normal, vec3 lightDir, float specularFactor)
 {
-	vec3 viewVec = normalize(ubo.position);
+	vec3 viewVec = normalize(vec3(ubo.position));
 	vec3 halfVec = normalize(lightDir + viewVec);
 	return pow(clamp(dot(normal, halfVec), 0.0, 1.0), specularFactor);
 }
@@ -171,15 +186,22 @@ vec3 getPointOnRay(Ray r, float t) {
 
 void scatterRay(
 	inout PathSegment path,
-    vec3 hitPoint,
-    vec3 normal
+	Intersection intersect
     )
 {
 	// Diffuse case
-	vec3 scatteredRayDirection = normalize(calculateRandomDirectionInHemisphere(normal));
-	//path.color *= abs(dot(scatteredRayDirection, normal)) * vec3(1, 0, 1);
+	vec3 scatteredRayDirection;
+	Material mat = materials[intersect.materialId];
+	if (mat.specular != vec4(0.0, 0.0, 0.0, 1.0)) {
+		scatteredRayDirection = reflect(path.ray.direction, intersect.hitNormal);
+		path.color *= vec3(mat.specular);
+	} else {
+		scatteredRayDirection = normalize(calculateRandomDirectionInHemisphere(intersect.hitNormal));
+	}
+
+	//path.color *= abs(dot(scatteredRayDirection, intersect.hitNormal)) * vec3(mat.diffuse);
 	path.ray.direction = scatteredRayDirection;
-	path.ray.origin = hitPoint + EPSILON * scatteredRayDirection;
+	path.ray.origin = intersect.hitPoint + EPSILON * scatteredRayDirection;
 }
 
 
@@ -295,6 +317,7 @@ Intersection computeIntersections(
 	vec3 normal;
 	vec3 hitPoint;
 	int objectID = -1;
+	int materialID = 0;
 	Intersection intersection;
 
 	// Triangles
@@ -304,7 +327,7 @@ Intersection computeIntersections(
 		// Reconstruct triangle
 		Triangle tri;
 		tri.id = i;
-		tri.materialId = 0;
+		tri.materialId = indices[i].w;
 		tri.vert0 = vec3(positions[indices[i].x]);
 		tri.vert1 = vec3(positions[indices[i].y]);
 		tri.vert2 = vec3(positions[indices[i].z]);
@@ -321,6 +344,7 @@ Intersection computeIntersections(
 			tMin = tTri;
 			normal = tmp_normal;
 			hitPoint = tmp_hitPoint;
+			materialID = tri.materialId;
 		}
 	}
 
@@ -329,7 +353,7 @@ Intersection computeIntersections(
 		intersection.t = -1.0;
 	} else {
 		intersection.t = tMin;
-		intersection.materialId = 0;
+		intersection.materialId = materialID;
 		intersection.hitNormal = normal;
 		intersection.hitPoint = hitPoint;
 		intersection.objectID = objectID;
@@ -350,7 +374,7 @@ float calcShadow(in Ray feeler, in int objectId, inout float t)
 		// Reconstruct triangle
 		Triangle tri;
 		tri.id = i;
-		tri.materialId = 0;
+		tri.materialId = indices[i].w;
 		tri.vert0 = vec3(positions[indices[i].x]);
 		tri.vert1 = vec3(positions[indices[i].y]);
 		tri.vert2 = vec3(positions[indices[i].z]);
@@ -380,23 +404,30 @@ void shadeMaterial(
 	if (path.remainingBounces > 0) {
 		if (intersect.t > 0.0) {
 
-			// Hit something
-			vec3 lightVec = normalize(LIGHT_POS - intersect.hitPoint);
-			
-			// Shade color
-			float diffuse = lightDiffuse(intersect.hitNormal, lightVec);
-			path.color = vec3(1, 1, 0) * diffuse;	
+			Material mat = materials[intersect.materialId];
+			if (mat.shininess > 0.0) {
+				// Hack, assume this is light material
+				path.color *= vec3(1,1,1) * mat.shininess;	
+				path.remainingBounces = 0;
+			} else {
 
-			// Light feeler test
-			Ray feeler;
-			feeler.origin = intersect.hitPoint;
-			feeler.direction = lightVec;
-			float t = length(LIGHT_POS - intersect.hitPoint);
-			path.color *= calcShadow(feeler, intersect.objectID, t);
+				// Shade color
+				vec3 lightVec = normalize(LIGHT_POS - intersect.hitPoint);
+				float diffuse = lightDiffuse(intersect.hitNormal, lightVec);
+				path.color = vec3(mat.diffuse) * diffuse;	
+				
+				// Reflect ray for next render pass
+				scatterRay(path, intersect);
 
-			// Reflect ray for next render pass
-			scatterRay(path, intersect.hitPoint, intersect.hitNormal);
-			path.remainingBounces -= 1;
+				// Light feeler test
+				Ray feeler;
+				feeler.origin = intersect.hitPoint;
+				feeler.direction = lightVec;
+				float t = length(LIGHT_POS - intersect.hitPoint);
+				path.color *= calcShadow(feeler, intersect.objectID, t);
+
+				path.remainingBounces -= 1;
+			}
 
 		} else {
 			// Didn't hit anything
@@ -427,12 +458,12 @@ void castRayFromCamera(in int width, in int height, inout Ray ray)
 	uint x = gl_GlobalInvocationID.x;
 	uint y =  gl_GlobalInvocationID.y;
 	if (x < width && y < height) {
-		ray.origin = camera.position;
-		ray.direction = normalize(
+		ray.origin = vec3(camera.position);
+		ray.direction = normalize(vec3(
 			camera.forward 
 			- camera.right * camera.pixelLength.x * (float(x) - float(width) * 0.5)
 			- camera.up * camera.pixelLength.y * (float(y) - float(height) * 0.5)
-			);
+			));
 	}
 }
 
@@ -443,11 +474,11 @@ void main()
 	vec2 uv = vec2(gl_GlobalInvocationID.xy) / dim;
 
 	// Initialize camera
-	camera.position = vec3(0.0, 3, 5);
-	camera.right = vec3(1,0,0);
-	camera.up = vec3(0,1,0);
+	camera.position = ubo.position;
+	camera.right = ubo.right;
+	camera.up = ubo.up;
 	camera.aspectRatio = dim.x / dim.y;
-	camera.lookat = vec3(0, 2.5, 0);
+	camera.lookat = ubo.lookat;
 	camera.forward = normalize(camera.lookat - camera.position);
 	camera.fov = 45.0;
 
