@@ -723,6 +723,20 @@ VulkanDevice::CreateMemory(
 }
 
 void 
+VulkanDevice::MapMemory(
+	void* data, 
+	VkDeviceMemory& memory,
+	VkDeviceSize size, 
+	VkDeviceSize offset
+	) 
+{
+	void* temp;
+	vkMapMemory(device, memory, offset, size, 0, &temp);
+	memcpy(temp, data, size);
+	vkUnmapMemory(device, memory);
+}
+
+void 
 VulkanDevice::CreateBufferAndMemory(
 	const VkDeviceSize size, 
 	const VkBufferUsageFlags usage, 

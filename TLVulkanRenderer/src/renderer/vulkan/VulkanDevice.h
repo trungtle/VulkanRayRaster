@@ -141,6 +141,14 @@ public:
 	) const;
 
 	void
+	MapMemory(
+		void* data,
+		VkDeviceMemory& memory,
+		VkDeviceSize size,
+		VkDeviceSize offset
+	);
+
+	void
 	CreateBufferAndMemory(
 		const VkDeviceSize size,
 		const VkBufferUsageFlags usage,

@@ -63,7 +63,7 @@ protected:
 
 	void
 	PrepareComputeStorageBuffer();
-	
+
 	void
 	PrepareComputeUniformBuffer();
 
@@ -108,8 +108,10 @@ protected:
 			VkDeviceMemory uniformMemory;
 
 			// -- Shapes buffers
-			VulkanBuffer::StorageBuffer triangles;
-			VkDeviceMemory trianglesMemory;
+			VulkanBuffer::StorageBuffer vertices;
+
+			VulkanBuffer::StorageBuffer indices;
+
 		} buffers;
 
 		// -- Output storage image

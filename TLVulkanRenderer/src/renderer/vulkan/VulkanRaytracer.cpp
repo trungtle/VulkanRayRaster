@@ -88,8 +88,11 @@ VulkanRaytracer::~VulkanRaytracer()
 	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.uniform.buffer, nullptr);
 	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.uniformMemory, nullptr);
 
-	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.triangles.buffer, nullptr);
-	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.trianglesMemory, nullptr);
+	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.indices.buffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.indices.memory, nullptr);
+
+	vkDestroyBuffer(m_vulkanDevice->device, m_compute.buffers.vertices.buffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, m_compute.buffers.vertices.memory, nullptr);
 
 }
 
@@ -610,13 +613,13 @@ VulkanRaytracer::PrepareComputeDescriptors()
 		// Uniform buffer for compute
 		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		// Mesh storage buffers
-		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
+		MakeDescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2)
 	};
 
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = MakeDescriptorPoolCreateInfo(
 		poolSizes.size(),
 		poolSizes.data(),
-		3
+		5
 	);
 
 	CheckVulkanResult(
@@ -637,9 +640,15 @@ VulkanRaytracer::PrepareComputeDescriptors()
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			VK_SHADER_STAGE_COMPUTE_BIT
 		),
-		// Binding 2: uniform buffer for triangles
+		// Binding 2: storage buffer for triangle indices
 		MakeDescriptorSetLayoutBinding(
 			2,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_SHADER_STAGE_COMPUTE_BIT
+		),
+		// Binding 3: storage buffer for triangle vertices
+		MakeDescriptorSetLayoutBinding(
+			3,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			VK_SHADER_STAGE_COMPUTE_BIT
 		),
@@ -690,7 +699,15 @@ VulkanRaytracer::PrepareComputeDescriptors()
 			m_compute.descriptorSets,
 			2, // Binding 2
 			1,
-			&m_compute.buffers.triangles.descriptor,
+			&m_compute.buffers.indices.descriptor,
+			nullptr
+		),
+		MakeWriteDescriptorSet(
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			m_compute.descriptorSets,
+			3, // Binding 3
+			1,
+			&m_compute.buffers.vertices.descriptor,
 			nullptr
 		),
 	};
@@ -742,66 +759,104 @@ Triangle newTriangle(
 void 
 VulkanRaytracer::PrepareComputeStorageBuffer() 
 {
-	// Triangles
-	std::vector<Triangle> tris;
-	tris.push_back(
-		newTriangle(glm::vec3(-1,0,0), glm::vec3(0,1,0), glm::vec3(1,0,0), 
-			glm::vec3(0,0,1))
-		);
-	tris.push_back(
-		newTriangle(glm::vec3(-1, 0, 0), glm::vec3(0, -1, 0), glm::vec3(1, 0, 0),
-			glm::vec3(0, 0, 1))
-	);
-	VkDeviceSize storageBufferSize = tris.size() * sizeof(Triangle);
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingMemory;
+	// =========== INDICES
+	std::vector<ivec4> indices = {
+		ivec4(0, 1, 2, 0),
+		ivec4(0, 3, 2, 0),
+	};
+
+	VulkanBuffer::StorageBuffer stagingBuffer;
+	VkDeviceSize bufferSize = indices.size() * sizeof(ivec4);
 
 	// Stage
-	m_vulkanDevice->CreateBuffer(
-		storageBufferSize,
+	m_vulkanDevice->CreateBufferAndMemory(
+		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		stagingBuffer
-	);
-
-	m_vulkanDevice->CreateMemory(
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		stagingBuffer,
-		stagingMemory
+		stagingBuffer.buffer,
+		stagingBuffer.memory
 	);
 
-	int s = sizeof(Plane);
-
-	vkBindBufferMemory(m_vulkanDevice->device, stagingBuffer, stagingMemory, 0);
-
-	void* data;
-	vkMapMemory(m_vulkanDevice->device, stagingMemory, 0, storageBufferSize, 0, &data);
-	memcpy(data, tris.data(), static_cast<size_t>(storageBufferSize));
-	vkUnmapMemory(m_vulkanDevice->device, stagingMemory);
+	m_vulkanDevice->MapMemory(
+		indices.data(),
+		stagingBuffer.memory,
+		bufferSize,
+		0
+		);
 
 	// -----------------------------------------
 
 	m_vulkanDevice->CreateBufferAndMemory(
-		storageBufferSize,
+		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_compute.buffers.triangles.buffer,
-		m_compute.buffers.trianglesMemory
+		m_compute.buffers.indices.buffer,
+		m_compute.buffers.indices.memory
 	);
 
 	// Copy over to vertex buffer in device local memory
 	m_vulkanDevice->CopyBuffer(
 		m_compute.queue,
 		m_compute.commandPool,
-		m_compute.buffers.triangles.buffer,
-		stagingBuffer,
-		storageBufferSize
+		m_compute.buffers.indices.buffer,
+		stagingBuffer.buffer,
+		bufferSize
 	);
 
-	m_compute.buffers.triangles.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.triangles.buffer, 0, storageBufferSize);
+	m_compute.buffers.indices.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.indices.buffer, 0, bufferSize);
 
 	// Cleanup staging buffer memory
-	vkDestroyBuffer(m_vulkanDevice->device, stagingBuffer, nullptr);
-	vkFreeMemory(m_vulkanDevice->device, stagingMemory, nullptr);
+	vkDestroyBuffer(m_vulkanDevice->device, stagingBuffer.buffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, stagingBuffer.memory, nullptr);
+
+	// =========== VERTICES
+	std::vector<glm::vec4> vertices = {
+		glm::vec4(1, 0, 0, 1), glm::vec4(0, -1, 0, 1), glm::vec4(-1, 0, 0, 1),
+		glm::vec4(0, 1, 0, 1)
+	};
+
+	bufferSize = vertices.size() * sizeof(glm::vec4);
+
+	// Stage
+	m_vulkanDevice->CreateBufferAndMemory(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer.buffer,
+		stagingBuffer.memory
+	);
+
+	m_vulkanDevice->MapMemory(
+		vertices.data(),
+		stagingBuffer.memory,
+		bufferSize,
+		0
+	);
+
+	// -----------------------------------------
+
+	m_vulkanDevice->CreateBufferAndMemory(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_compute.buffers.vertices.buffer,
+		m_compute.buffers.vertices.memory
+	);
+
+	// Copy over to vertex buffer in device local memory
+	m_vulkanDevice->CopyBuffer(
+		m_compute.queue,
+		m_compute.commandPool,
+		m_compute.buffers.vertices.buffer,
+		stagingBuffer.buffer,
+		bufferSize
+	);
+
+	m_compute.buffers.vertices.descriptor = MakeDescriptorBufferInfo(m_compute.buffers.vertices.buffer, 0, bufferSize);
+
+	// Cleanup staging buffer memory
+	vkDestroyBuffer(m_vulkanDevice->device, stagingBuffer.buffer, nullptr);
+	vkFreeMemory(m_vulkanDevice->device, stagingBuffer.memory, nullptr);
 
 }
 

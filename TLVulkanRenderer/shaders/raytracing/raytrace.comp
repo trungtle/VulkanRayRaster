@@ -58,9 +58,14 @@ struct Ray
 	vec3 direction;
 };
 
-layout (std140, binding = 2) buffer Triangles
+layout (std140, binding = 2) buffer TriangleIndices
 {
-	Triangle triangles[ ];
+	ivec4 indices[ ];
+};
+
+layout (std140, binding = 3) buffer TriangleVertices
+{
+	vec4 vertices[ ];
 };
 
 void reflectRay(inout vec3 rayD, in vec3 normal)
@@ -139,8 +144,13 @@ int intersect(in Ray ray, inout float resT)
 {
 	int id = -1;
 
-	for (int i = 0; i < triangles.length(); ++i) {
-		Triangle tri = triangles[i];
+	for (int i = 0; i < indices.length(); ++i) {
+		Triangle tri;
+		tri.id = 0;
+		tri.materialId = 0;
+		tri.vert0 = vec3(vertices[indices[i].x]);
+		tri.vert1 = vec3(vertices[indices[i].y]);
+		tri.vert2 = vec3(vertices[indices[i].z]);
 
 		float tTri = triangleIntersect(tri, ray);
 		if ((tTri > EPSILON) && (tTri < resT))

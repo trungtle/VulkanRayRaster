@@ -13,6 +13,7 @@ namespace VulkanBuffer
 	struct StorageBuffer
 	{
 		VkBuffer buffer;
+		VkDeviceMemory memory;
 		VkDescriptorBufferInfo descriptor;
 	};
 
