@@ -26,11 +26,11 @@ typedef struct VertexAttributeInfoTyp
 // GEOMETRY
 // ----------
 
-typedef struct GeometryDataTyp
+struct MeshData
 {
 	std::map<EVertexAttributeType, std::vector<Byte>> vertexData;
 	std::map<EVertexAttributeType, VertexAttributeInfo> vertexAttributes;
-} GeometryData;
+};
 
 struct Triangle
 {

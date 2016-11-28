@@ -11,7 +11,10 @@ public:
 	Scene(std::string fileName);
 	~Scene();
 	
-	std::vector<GeometryData*> geometriesData;
-	std::vector<Material> m_materials;
+	std::vector<MeshData*> meshesData;
+	std::vector<Material> materials;
+	std::vector<glm::ivec4> indices;
+	std::vector<glm::vec4> verticePositions;
+	std::vector<glm::vec4> verticeNormals;
 };
 

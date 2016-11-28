@@ -5,9 +5,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-layout (local_size_x = 16, local_size_y = 16) in;
-layout (binding = 0, rgba8) uniform writeonly image2D resultImage;
-
+#define PI 3.1415926535897
 #define EPSILON 0.000001
 #define MAXLEN 1000.0
 #define RAYBOUNCES 2
@@ -15,6 +13,7 @@ layout (binding = 0, rgba8) uniform writeonly image2D resultImage;
 #define REFLECTIONSTRENGTH 0.4
 #define REFLECTIONFALLOFF 0.5
 
+vec3 LIGHT_POS = vec3(0, 4, -2);
 
 struct Camera
 {
@@ -30,6 +29,50 @@ struct Camera
 
 Camera camera;
 
+struct Triangle
+{
+	int id;
+	int materialId;
+
+	vec3 vert0;
+	vec3 vert1;
+	vec3 vert2;
+
+	vec3 norm0;
+	vec3 norm1;
+	vec3 norm2;
+};
+
+struct Box
+{
+	mat4 transform;
+	mat4 invTransform;
+};
+
+struct Ray
+{
+	vec3 origin;
+	vec3 direction;
+};
+
+struct PathSegment {
+	Ray ray;
+	vec3 color;
+	int pixelIndex;
+	int remainingBounces;
+	bool shouldTerminate;
+};
+
+struct Intersection {
+	vec3 hitNormal;
+	float t;
+	vec3 hitPoint;
+	int materialId;
+};
+
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0, rgba8) uniform writeonly image2D resultImage;
+
 layout (binding = 1) uniform UBO 
 {
 	vec3 lightPos;
@@ -43,29 +86,20 @@ layout (binding = 1) uniform UBO
 	float aspectRatio;
 } ubo;
 
-struct Triangle
-{
-	vec3 vert0;
-	int id;
-	vec3 vert1;
-	int materialId;
-	vec3 vert2;
-};
-
-struct Ray
-{
-	vec3 origin;
-	vec3 direction;
-};
 
 layout (std140, binding = 2) buffer TriangleIndices
 {
 	ivec4 indices[ ];
 };
 
-layout (std140, binding = 3) buffer TriangleVertices
+layout (std140, binding = 3) buffer TrianglePositions
 {
-	vec4 vertices[ ];
+	vec4 positions[ ];
+};
+
+layout (std140, binding = 4) buffer TriangleNormals
+{
+	vec4 normals[ ];
 };
 
 void reflectRay(inout vec3 rayD, in vec3 normal)
@@ -87,12 +121,20 @@ float lightSpecular(vec3 normal, vec3 lightDir, float specularFactor)
 	return pow(clamp(dot(normal, halfVec), 0.0, 1.0), specularFactor);
 }
 
+// Intersection helper ===========================================================
+
+
+vec3 getPointOnRay(Ray r, float t) {
+    return r.origin + (t - .0001f) * normalize(r.direction);
+}
 
 // Triangle ===========================================================
 
 float triangleIntersect(
 	in Triangle tri, 
-	in Ray r
+	in Ray r,
+	out vec3 normal,
+	out vec3 hitPoint
 	) 
 {
 	// Compute fast intersection using Muller and Trumbore, this skips computing the plane's equation.
@@ -134,65 +176,155 @@ float triangleIntersect(
 	// Compute t
 	t = dot(edge2, qvec) * inv_det;
 
+	hitPoint = getPointOnRay(r, t);
+	normal = normalize(tri.norm0 * (1 - u - v) + tri.norm1 * u + tri.norm2 * v);
+
 	return t;
 }
 
+// Box ===========================================================
 
-// Intersection ===========================================================
-	
-int intersect(in Ray ray, inout float resT)
+float boxIntersect(
+	Box box, 
+	Ray ray,
+	out vec3 normal,
+    out vec3 hitPoint
+	) 
 {
-	int id = -1;
 
-	for (int i = 0; i < indices.length(); ++i) {
-		Triangle tri;
-		tri.id = 0;
-		tri.materialId = 0;
-		tri.vert0 = vec3(vertices[indices[i].x]);
-		tri.vert1 = vec3(vertices[indices[i].y]);
-		tri.vert2 = vec3(vertices[indices[i].z]);
+    float tmin = -1e38;
+    float tmax = 1e38;
+    vec3 tmin_n;
+    vec3 tmax_n;
+    
+	for (int xyz = 0; xyz < 3; ++xyz) {
+        float qdxyz = ray.direction[xyz];
+        /*if (glm::abs(qdxyz) > 0.00001f)*/ {
+            float t1 = (-0.5f - ray.origin[xyz]) / qdxyz;
+            float t2 = (+0.5f - ray.origin[xyz]) / qdxyz;
+            float ta = min(t1, t2);
+            float tb = max(t1, t2);
+            vec3 n;
+            n[xyz] = t2 < t1 ? +1 : -1;
+            if (ta > 0 && ta > tmin) {
+                tmin = ta;
+                tmin_n = n;
+            }
+            if (tb < tmax) {
+                tmax = tb;
+                tmax_n = n;
+            }
+        }
+    }
 
-		float tTri = triangleIntersect(tri, ray);
-		if ((tTri > EPSILON) && (tTri < resT))
-		{
-			id = tri.id;
-			resT = tTri;
-		}
-	}
-	
-	return id;
+    if (tmax >= tmin && tmax > 0) {
+        if (tmin <= 0) {
+            tmin = tmax;
+            tmin_n = tmax_n;
+        }
+		hitPoint = getPointOnRay(ray, tmin);
+		normal = vec3(tmin_n);
+		return tmin;
+    }
+    return -1;
 }
 
-vec3 renderScene(inout Ray ray)
+// Intersection ===========================================================
+
+Intersection computeIntersections(
+	int depth,
+	in Ray ray
+	)
+{
+	float tMin = MAXLEN;
+	vec3 normal;
+	vec3 hitPoint;
+	int objectID = -1;
+	Intersection intersection;
+
+	// Triangles
+
+	for (int i = 0; i < indices.length(); ++i) {
+		
+		// Reconstruct triangle
+		Triangle tri;
+		tri.id = i;
+		tri.materialId = 0;
+		tri.vert0 = vec3(positions[indices[i].x]);
+		tri.vert1 = vec3(positions[indices[i].y]);
+		tri.vert2 = vec3(positions[indices[i].z]);
+		tri.norm0 = vec3(normals[indices[i].x]);
+		tri.norm1 = vec3(normals[indices[i].y]);
+		tri.norm2 = vec3(normals[indices[i].z]);
+		
+		vec3 tmp_normal;
+		vec3 tmp_hitPoint;
+		float tTri = triangleIntersect(tri, ray, tmp_normal, tmp_hitPoint);
+		if ((tTri > EPSILON) && (tTri < tMin))
+		{
+			objectID = tri.id;
+			tMin = tTri;
+			normal = tmp_normal;
+			hitPoint = tmp_hitPoint;
+		}
+	}
+
+	if (objectID == -1)
+	{
+		intersection.t = -1.0;
+	} else {
+		intersection.t = tMin;
+		intersection.materialId = 0;
+		intersection.hitNormal = normal;
+		intersection.hitPoint = hitPoint;
+	}
+
+	return intersection;
+}
+
+void shadeMaterial(
+	int iter,
+	in Intersection intersect,
+	inout PathSegment path
+	)
+{
+	if (path.remainingBounces > 0) {
+		if (intersect.t > 0.0) {
+
+			// Hit something
+
+			vec3 pos = intersect.hitPoint;
+			vec3 lightVec = normalize(LIGHT_POS - pos);				
+
+			float diffuse = lightDiffuse(intersect.hitNormal, lightVec);
+			path.color = vec3(1, 1, 0) * diffuse;	
+
+			// Reflect ray for next render pass
+			reflectRay(path.ray.direction, intersect.hitNormal);
+			path.remainingBounces -= 1;
+	
+
+		} else {
+			// Didn't hit anything
+			path.remainingBounces = 0;
+			path.color = vec3(0);
+		}
+	}
+}
+
+vec3 renderScene(inout PathSegment path)
 {
 	vec3 color = vec3(0.0);
 	float t = MAXLEN;
 
 	// Get intersected object ID
-	int objectID = intersect(ray, t);
+	int depth = 8;
+	Intersection intersect = computeIntersections(depth, path.ray);
+	depth++;
 	
-	if (objectID == -1)
-	{
-		return color;
-	}
-	
-	vec3 pos = ray.origin + t * ray.direction;
-	vec3 lightVec = normalize(ubo.lightPos - pos);				
+	shadeMaterial(0, intersect, path);
 
-	// Triangle
-
-	vec3 normal;
-	if (objectID == 0) {
-		normal = vec3(0, 0, -1);
-		float diffuse = lightDiffuse(normal, lightVec);
-		color = vec3(1, 1, 0) * diffuse;	
-	}
-
-	// Reflect ray for next render pass
-	reflectRay(ray.direction, normal);
-	ray.origin = pos;	
-	
-	return color;
+	return path.color;
 }
 
 // Generate ray ========================
@@ -217,34 +349,36 @@ void main()
 	ivec2 dim = imageSize(resultImage);
 	vec2 uv = vec2(gl_GlobalInvocationID.xy) / dim;
 
-	camera.position = ubo.position;
+	// Initialize camera
+	camera.position = vec3(0.1,3.0,2.5);
 	camera.right = vec3(1,0,0);
 	camera.up = vec3(0,1,0);
 	camera.aspectRatio = dim.x / dim.y;
 	camera.lookat = vec3(0, 0, 0);
 	camera.forward = normalize(camera.lookat - camera.position);
-	camera.fov = 10.0;
-	camera.pixelLength = vec2(0.00058, 0.00058);
+	camera.fov = 45.0;
 
+	float yScaled = tan(camera.fov * PI / 180.0);
+	float xScaled = yScaled * camera.aspectRatio;
 
-	Ray ray;
-	castRayFromCamera(dim.x, dim.y, ray);		
+	camera.pixelLength = vec2(2 * xScaled / float(dim.x), 2 * yScaled / float(dim.y));
 
-	// Basic color path
-	int id = 0;
-	vec3 finalColor = renderScene(ray);
+	PathSegment path;
+	path.color = vec3(0);
+	path.pixelIndex = 0;
+	path.remainingBounces = 8;
+	path.shouldTerminate = false;
+
+	castRayFromCamera(dim.x, dim.y, path.ray);		
+
+	// Trace ray
+	bool iterComplete = false;
 	
-	// Reflection
-	//if (REFLECTIONS)
-	//{
-	//	float reflectionStrength = REFLECTIONSTRENGTH;
-	//	for (int i = 0; i < RAYBOUNCES; i++)
-	//	{
-	//		vec3 reflectionColor = renderScene(ray);
-	//		finalColor = (1.0 - reflectionStrength) * finalColor + reflectionStrength * mix(reflectionColor, finalColor, 1.0 - reflectionStrength);			
-	//		reflectionStrength *= REFLECTIONFALLOFF;
-	//	}
-	//}
+	vec3 finalColor;
+	while(!iterComplete) {
+		finalColor = renderScene(path);
+		iterComplete = true;
+	}
 
 	imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(finalColor, 0.0));
 }

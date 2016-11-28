@@ -108,9 +108,9 @@ protected:
 			VkDeviceMemory uniformMemory;
 
 			// -- Shapes buffers
-			VulkanBuffer::StorageBuffer vertices;
-
 			VulkanBuffer::StorageBuffer indices;
+			VulkanBuffer::StorageBuffer verticePositions;
+			VulkanBuffer::StorageBuffer verticeNormals;
 
 		} buffers;
 
@@ -119,14 +119,14 @@ protected:
 
 		struct UBOCompute
 		{							// Compute shader uniform block object
-			glm::vec3 lightPos = glm::vec3(1.0f, 2.0f, -1.0f);
-			glm::vec3 position = glm::vec3(0.0f, 0.0f, -10.0f);
+			glm::vec3 lightPos = glm::vec3(1.0f, 2.0f, -10.0f);
+			glm::vec3 position = glm::vec3(0.0f, 0.0f, 10.0f);
 			glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);;
 			glm::vec3 lookat = glm::vec3(0.0f);
 			glm::vec3 forward;
 			glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 			glm::vec2 pixelLength;
-			float fov = 10.0f;
+			float fov = 40.0f;
 			float aspectRatio = 45.0f;
 		} ubo;
 	} m_compute;
