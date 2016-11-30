@@ -1,6 +1,10 @@
 #pragma once
+#include "Typedef.h"
+#include <glm/glm.hpp>
 
-typedef unsigned char Byte;
+// ---------
+// VERTEX
+// ----------
 
 typedef enum
 {
@@ -9,7 +13,6 @@ typedef enum
 	NORMAL,
 	TEXCOORD
 } EVertexAttributeType;
-
 
 typedef struct VertexAttributeInfoTyp
 {
@@ -20,6 +23,20 @@ typedef struct VertexAttributeInfoTyp
 
 } VertexAttributeInfo;
 
+// ---------
+// GEOMETRY
+// ----------
+
+struct MeshData
+{
+	std::map<EVertexAttributeType, std::vector<Byte>> vertexData;
+	std::map<EVertexAttributeType, VertexAttributeInfo> vertexAttributes;
+};
+
+// ---------
+// MATERIAL
+// ----------
+
 typedef struct MaterialTyp
 {
 	glm::vec4 diffuse;
@@ -28,6 +45,8 @@ typedef struct MaterialTyp
 	glm::vec4 specular;
 	float shininess;
 	float transparency;
+	glm::ivec2 _pad;
 } Material;
+
 
 

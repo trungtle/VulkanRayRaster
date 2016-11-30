@@ -987,6 +987,7 @@ Scene::Scene(
 		const glm::mat4 & matrix = nodeString.second;
 		const glm::mat3 & matrixNormal = glm::transpose(glm::inverse(glm::mat3(matrix)));
 
+		int materialId = 0;
 		for (auto& meshName : node.meshes)
 		{
 			auto& mesh = scene.meshes.at(meshName);
@@ -998,7 +999,7 @@ Scene::Scene(
 					return;
 				}
 
-				GeometryData* geom = new GeometryData();
+				MeshData* geom = new MeshData();
 
 				// -------- Indices ----------
 				{
@@ -1025,6 +1026,13 @@ Scene::Scene(
 					};
 					geom->vertexAttributes.insert(std::make_pair(EVertexAttributeType::INDEX, attributeInfo));
 					geom->vertexData.insert(std::make_pair(EVertexAttributeType::INDEX, data));
+
+					int indicesCount = indexAccessor.count;
+					uint16_t* in = reinterpret_cast<uint16_t*>(data.data());
+					for (auto iCount = 0; iCount < indicesCount; iCount += 3)
+					{
+						indices.push_back(glm::ivec4(in[iCount], in[iCount + 1], in[iCount + 2], materialId));
+					}
 				}
 
 				// -------- Attributes -----------
@@ -1057,7 +1065,8 @@ Scene::Scene(
 						glm::vec3* positions = reinterpret_cast<glm::vec3*>(data.data());
 						for (auto p = 0; p < positionCount; ++p)
 						{
-							positions[p] = matrix * glm::vec4(positions[p], 1.0f);
+							positions[p] = glm::vec3(matrix * glm::vec4(positions[p], 1.0f));
+							verticePositions.push_back(glm::vec4(positions[p], 1.0f));
 						}
 					}
 
@@ -1071,6 +1080,7 @@ Scene::Scene(
 						for (auto p = 0; p < normalCount; ++p)
 						{
 							normals[p] = glm::normalize(matrixNormal * glm::vec4(normals[p], 1.0f));
+							verticeNormals.push_back(glm::vec4(normals[p], 0.0f));
 						}
 					}
 
@@ -1155,12 +1165,16 @@ Scene::Scene(
 							material.transparency = 1.0f;
 						}
 
-						m_materials.push_back(material);
-						//++materialId;
+						// Hack for light material
+						if (materialId == 9 || materialId == 8) {
+							material.shininess = 1;
+						}
+						materials.push_back(material);
+						++materialId;
 					}
 				}
 
-				m_geometriesData.push_back(geom);
+				meshesData.push_back(geom);
 			}
 		}
 	}
@@ -1171,7 +1185,7 @@ Scene::Scene(
 
 Scene::~Scene()
 {
-	for (GeometryData* geom : m_geometriesData) {
+	for (MeshData* geom : meshesData) {
 		delete geom;
 		geom = nullptr;
 	}

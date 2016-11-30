@@ -3,7 +3,13 @@
 
 #include "Utilities.h"
 
-std::vector<char> 
+glm::vec4 
+NormalizeColor(int r, int g, int b, int alpha) 
+{
+	return glm::vec4(r, g, b, alpha) / 255.0f;
+}
+
+std::vector<Byte> 
 ReadBinaryFile(
 	const std::string& fileName	
 	) 
@@ -16,10 +22,10 @@ ReadBinaryFile(
 	}
 
 	size_t fileSize = static_cast<size_t>(file.tellg());
-	std::vector<char> buffer(fileSize);
+	std::vector<Byte> buffer(fileSize);
 
 	file.seekg(0);
-	file.read(buffer.data(), fileSize);
+	file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
 
 	file.close();
 
@@ -28,12 +34,9 @@ ReadBinaryFile(
 
 void
 LoadSPIR_V(
-	const char* vertShaderFilePath
-	, const char* fragShaderFilePath
-	, std::vector<char>& outVertShader
-	, std::vector<char>& outFragShader
+	const char* filePath, 
+	std::vector<Byte>& outShader
 	)
 {
-	outVertShader = ReadBinaryFile(vertShaderFilePath);
-	outFragShader = ReadBinaryFile(fragShaderFilePath);
+	outShader = ReadBinaryFile(filePath);
 }

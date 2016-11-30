@@ -15,6 +15,13 @@ typedef enum
     , DirectX // @note: not in roadmap
 } EGraphicsAPI;
 
+enum ERenderingMode
+{
+	FORWARD,
+	DEFERRED,
+	RAYTRACING,
+	DEFFERRED_RAYTRACING
+};
 
 /**
  * \brief This is the base rendering interface class
